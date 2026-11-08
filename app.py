@@ -1,5 +1,6 @@
 import html
 import json
+import random
 import shutil
 import urllib.request
 import tempfile
@@ -9,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 
 import streamlit as st
+import streamlit.components.v1 as components
 from langchain_core.messages import HumanMessage
 
 from backend.btw_handler import handle_btw
@@ -661,6 +663,59 @@ div[role="dialog"] { border-radius: 20px !important; }
 }
 [class*="st-key-sample_"] button p { font-size: .82rem !important; font-weight: 600 !important; color: var(--sl-on-accent) !important; }
 [class*="st-key-sample_"] button:hover { background: var(--sl-accent-hover) !important; }
+[class*="st-key-suggest_card_"] {
+    padding: .65rem .7rem; margin-bottom: .2rem; border-radius: 14px;
+    background: var(--sl-accent-soft); border: 1px dashed var(--sl-accent);
+}
+[class*="st-key-suggest_card_"] [data-testid="stVerticalBlock"] { gap: .4rem !important; }
+[class*="st-key-suggest_card_"] [data-testid="stHorizontalBlock"] { gap: .35rem !important; flex-wrap: nowrap !important; }
+[class*="st-key-suggest_card_"] [data-testid="stColumn"] { min-width: 0 !important; }
+.sl-suggest-label {
+    display: flex; align-items: center; gap: .3rem;
+    font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--sl-accent-text);
+}
+.sl-suggest-title {
+    font-size: .84rem; font-weight: 600; color: var(--sl-text); line-height: 1.35; margin-top: .25rem; cursor: help;
+}
+.sl-suggest-meta { font-size: .72rem; color: var(--sl-muted); margin-top: .1rem; }
+.sl-suggest-meta a { color: var(--sl-accent-text) !important; text-decoration: none; font-weight: 600; }
+.sl-suggest-meta a:hover { text-decoration: underline; }
+[class*="st-key-suggest_add_"] button {
+    min-height: 32px !important; justify-content: center !important; border-radius: 10px !important;
+    background: var(--sl-accent) !important; border: none !important;
+}
+[class*="st-key-suggest_add_"] button p, [class*="st-key-suggest_add_"] button [data-testid="stIconMaterial"] {
+    color: var(--sl-on-accent) !important; font-size: .8rem !important; font-weight: 600 !important;
+}
+[class*="st-key-suggest_add_"] button:hover { background: var(--sl-accent-hover) !important; }
+[class*="st-key-suggest_next_"] button {
+    min-height: 32px !important; justify-content: center !important; border-radius: 10px !important;
+    background: var(--sl-surface-solid) !important; border: 1px solid var(--sl-border-strong) !important;
+}
+.sl-or {
+    text-align: center; font-size: .72rem; color: var(--sl-muted); margin: .45rem 0 .35rem;
+    display: flex; align-items: center; gap: .5rem;
+}
+.sl-or::before, .sl-or::after { content: ""; flex: 1; height: 1px; background: var(--sl-border-strong); }
+.sl-welcome-modal { text-align: center; margin: -.6rem 0 1.1rem; }
+.sl-modal-logo {
+    width: 56px; height: 56px; border-radius: 16px; margin: 0 auto .8rem;
+    display: grid; place-items: center; color: var(--sl-on-accent); background: var(--sl-accent);
+}
+.sl-modal-welcome-title { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.03em; color: var(--sl-text); }
+.sl-modal-welcome-sub { font-size: .9rem; color: var(--sl-muted); margin-top: .25rem; }
+.sl-chip-free { color: #0369A1; background: rgba(14,165,233,0.09); border-color: rgba(14,165,233,0.25); }
+.sl-modal-note {
+    font-size: .8rem; line-height: 1.5; color: var(--sl-muted);
+    padding: .6rem .8rem; margin-top: .7rem; border-radius: 10px;
+    background: var(--sl-surface-2); border: 1px dashed var(--sl-border-strong);
+}
+.st-key-intro_ok button {
+    margin-top: .6rem; min-height: 42px !important; border-radius: 12px !important;
+    background: var(--sl-accent) !important; border: none !important;
+}
+.st-key-intro_ok button p { color: var(--sl-on-accent) !important; font-weight: 700 !important; font-size: .92rem !important; }
+.st-key-intro_ok button:hover { background: var(--sl-accent-hover) !important; }
 .sl-modal-foot { font-size: .78rem; color: var(--sl-muted); margin-top: .7rem; text-align: center; }
 .sl-notice-compact { margin: 0 0 .7rem; padding: .65rem .75rem; gap: .55rem; border-left-width: 3px; }
 .sl-notice-compact .sl-notice-icon { width: 24px; height: 24px; border-radius: 7px; }
@@ -1083,8 +1138,19 @@ def process_pending_load() -> None:
     overlay.empty()
 
 
-@st.dialog("Before you upload", width="medium")
-def scope_dialog(session_id: str) -> None:
+def _scope_body(session_id: str, first_visit: bool = False) -> None:
+    """Shared content of the welcome (first visit) and "Before you upload" dialogs."""
+    if first_visit:
+        st.markdown(
+            f"""
+            <div class="sl-welcome-modal">
+              <div class="sl-modal-logo">{icon("book", 24)}</div>
+              <div class="sl-modal-welcome-title">Welcome to ScholarLens</div>
+              <div class="sl-modal-welcome-sub">Your workspace for reading, questioning and fact-checking research papers.</div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
     st.markdown(
         f"""
         <div class="sl-modal-hero">
@@ -1097,12 +1163,24 @@ def scope_dialog(session_id: str) -> None:
         <div class="sl-chips">
           <span class="sl-chip sl-chip-ok">{icon("file", 12)} Academic research papers</span>
           <span class="sl-chip">{icon("book", 12)} Up to {MAX_PAPER_PAGES} pages</span>
+          <span class="sl-chip sl-chip-free">{icon("sparkle", 12)} Free-tier AI models</span>
           <span class="sl-chip sl-chip-no">{icon("alert", 12)} Resumes, invoices, reports</span>
         </div>
-        <div class="sl-modal-section">Try a sample paper</div>
         """,
         unsafe_allow_html=True,
     )
+    if first_visit:
+        st.markdown(
+            '<div class="sl-modal-note">Because the app runs on free-tier models, answers can sometimes be '
+            "slower, and daily usage limits may occasionally pause it for a while.</div>",
+            unsafe_allow_html=True,
+        )
+    if first_visit:
+        if st.button("Got it, let's start", key="intro_ok", type="primary", use_container_width=True):
+            st.session_state.intro_ack = True
+            st.rerun()
+        return
+    st.markdown('<div class="sl-modal-section">Try a sample paper</div>', unsafe_allow_html=True)
     for i, (paper_title, arxiv_id, pages) in enumerate(SAMPLE_PAPERS):
         with st.container(key=f"sample_card_{i}"):
             c_info, c_add = st.columns([3.2, 1], vertical_alignment="center")
@@ -1121,6 +1199,97 @@ def scope_dialog(session_id: str) -> None:
         "to load it straight into this chat.</div>",
         unsafe_allow_html=True,
     )
+
+
+@st.dialog("Before you upload", width="medium")
+def scope_dialog(session_id: str) -> None:
+    _scope_body(session_id)
+
+
+@st.dialog(" ", width="medium")
+def welcome_dialog(session_id: str) -> None:
+    _scope_body(session_id, first_visit=True)
+
+
+INTRO_COOKIE = "sl_intro_seen"
+
+
+def maybe_show_welcome(session_id: str) -> None:
+    """Open the welcome dialog on a browser's first visit; remember "Got it" in a cookie."""
+    if st.session_state.get("intro_ack"):
+        if not st.session_state.get("intro_cookie_set"):
+            # components.html runs in a same-origin iframe, so this cookie belongs to the app.
+            components.html(
+                f"<script>document.cookie='{INTRO_COOKIE}=1; max-age=31536000; path=/; SameSite=Lax';</script>",
+                height=0,
+            )
+            st.session_state.intro_cookie_set = True
+        return
+    if st.session_state.get("intro_shown") or INTRO_COOKIE in st.context.cookies:
+        return
+    st.session_state.intro_shown = True
+    welcome_dialog(session_id)
+
+
+# Research papers published as web pages (Distill.pub), suggested in the Web tab. (title, url)
+WEB_SAMPLES = [
+    ("Feature Visualization", "https://distill.pub/2017/feature-visualization/"),
+    ("The Building Blocks of Interpretability", "https://distill.pub/2018/building-blocks/"),
+    ("Attention and Augmented Recurrent Neural Networks", "https://distill.pub/2016/augmented-rnns/"),
+]
+
+SUGGEST_TEXT = {
+    "file": ("Add this paper", "or upload your own · research papers only, max {pages} pages"),
+    "arxiv": ("Add this paper", "or search ArXiv · title or ID, max {pages} pages"),
+    "web": ("Add this page", "or paste your own links · research paper pages only"),
+}
+
+
+def suggestion_card(tab: str) -> None:
+    """A random sample paper (one per chat) offered before the user adds their own source."""
+    session_id = st.session_state.active_session_id
+    samples = WEB_SAMPLES if tab == "web" else SAMPLE_PAPERS
+    key = f"suggested_{tab}_{session_id}"
+    if key not in st.session_state:
+        st.session_state[key] = random.randrange(len(samples))
+    add_label, divider = SUGGEST_TEXT[tab]
+    if tab == "web":
+        title, link = samples[st.session_state[key]]
+        meta = f'{link.split("//", 1)[1].split("/", 1)[0]} · web article'
+        help_text = (
+            f"{title}: a research article published as a web page ({link}). Click Add to load it, "
+            "or paste links to your own research paper pages below."
+        )
+    else:
+        title, arxiv_id, pages = samples[st.session_state[key]]
+        link = f"https://arxiv.org/pdf/{arxiv_id}"
+        meta = f"arXiv {arxiv_id} · {pages} pages"
+        help_text = (
+            f"{title} (arXiv {arxiv_id}, {pages} pages). Click Add to load it into this chat, "
+            f"or add your own research paper below (max {MAX_PAPER_PAGES} pages)."
+        )
+
+    with st.container(key=f"suggest_card_{tab}"):
+        st.markdown(
+            f'<div class="sl-suggest-label">{icon("sparkle", 12)} No paper handy? Try this one</div>'
+            f'<div class="sl-suggest-title" title="{html.escape(help_text)}">{html.escape(title)}</div>'
+            f'<div class="sl-suggest-meta">{html.escape(meta)} · '
+            f'<a href="{link}" target="_blank" rel="noopener">{icon("download" if tab != "web" else "link", 11)} '
+            f'{"PDF" if tab != "web" else "Open"}</a></div>',
+            unsafe_allow_html=True,
+        )
+        c_add, c_next = st.columns([3, 1], gap="small")
+        if c_add.button(add_label, key=f"suggest_add_{tab}", icon=":material/add:",
+                        use_container_width=True, help=help_text):
+            if tab == "web":
+                queue_load("url", [link])
+            else:
+                queue_load("arxiv", [arxiv_id])
+        if c_next.button("", key=f"suggest_next_{tab}", icon=":material/shuffle:", use_container_width=True,
+                         help="Suggest a different paper"):
+            st.session_state[key] = (st.session_state[key] + 1) % len(samples)
+            st.rerun()
+    st.markdown(f'<div class="sl-or">{divider.format(pages=MAX_PAPER_PAGES)}</div>', unsafe_allow_html=True)
 
 
 def answer_meta(state: dict) -> dict:
@@ -1305,6 +1474,8 @@ if "active_session_id" not in st.session_state:
 
 active_sid = st.session_state.active_session_id
 process_pending_load()
+if "pending_load" not in st.session_state:
+    maybe_show_welcome(active_sid)
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -1387,6 +1558,7 @@ with st.sidebar:
 
     # ── Files ──────────────────────────────────────────────────────────────────
     with tab_files:
+        suggestion_card("file")
         uploaded_files = st.file_uploader(
             "PDF, TXT, or Markdown",
             type=["pdf", "txt", "md", "markdown"],
@@ -1394,7 +1566,8 @@ with st.sidebar:
             key=f"uploader_{active_sid}",
             label_visibility="collapsed",
         )
-        if st.button("Add files", use_container_width=True, key="btn_add_files"):
+        if st.button("Add files", use_container_width=True, key="btn_add_files",
+                     help=f"Upload academic research papers (PDF, TXT or Markdown), up to {MAX_PAPER_PAGES} pages each."):
             if uploaded_files:
                 done = st.session_state.get(f"processed_files_{active_sid}", set())
                 new = [(f.name, f.getvalue()) for f in uploaded_files if f.name not in done]
@@ -1406,6 +1579,7 @@ with st.sidebar:
 
     # ── Web pages ──────────────────────────────────────────────────────────────
     with tab_web:
+        suggestion_card("web")
         url_input = st.text_area(
             "URLs (one per line)",
             key=f"url_area_{active_sid}",
@@ -1422,6 +1596,7 @@ with st.sidebar:
 
     # ── ArXiv ──────────────────────────────────────────────────────────────────
     with tab_arxiv:
+        suggestion_card("arxiv")
         arxiv_title = st.text_input(
             "Paper title or ArXiv ID",
             key=f"arxiv_input_{active_sid}",
