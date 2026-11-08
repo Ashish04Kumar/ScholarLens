@@ -367,9 +367,11 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
     background: var(--sl-surface);
     border: 1px solid var(--sl-glass-edge);
     border-radius: 6px 20px 20px 20px;
-    padding: 1rem 1.2rem;
+    padding: 1rem 1.2rem 1.15rem;
     box-shadow: var(--sl-shadow-lg);
 }
+/* Streamlit drops the bottom margin of the last element; keep breathing room under badges */
+[data-testid="stChatMessage"]:not(:has(.sl-user)) [data-testid="stChatMessageContent"] > div:last-child { padding-bottom: .15rem; }
 [data-testid="stChatMessage"]:not(:has(.sl-user)) p,
 [data-testid="stChatMessage"]:not(:has(.sl-user)) li { color: var(--sl-text); }
 
@@ -406,7 +408,7 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 /* Answer meta */
 .sl-meta {
     display: flex; flex-wrap: wrap; gap: .45rem;
-    margin-top: .9rem; padding-top: .8rem; border-top: 1px dashed var(--sl-border-strong);
+    margin: .9rem 0 .2rem; padding-top: .8rem; border-top: 1px dashed var(--sl-border-strong);
 }
 .sl-badge {
     display: inline-flex; align-items: center; gap: .3rem;
@@ -564,6 +566,56 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 [class*="st-key-chatrow_active_"] [class*="st-key-trash_"] button { opacity: .6; }
 [class*="st-key-chatrow_"] [class*="st-key-trash_"] button:hover { opacity: 1 !important; }
 @media (hover: none) { [class*="st-key-chatrow_"] [class*="st-key-trash_"] button { opacity: .6; } }
+.st-key-show_details { padding: .55rem .7rem; border-radius: 12px; background: var(--sl-surface); border: 1px solid var(--sl-border); }
+.st-key-show_details label p { font-size: .82rem !important; font-weight: 500 !important; }
+/* hidden helper iframes (scroll script) take no space */
+[data-testid="stElementContainer"]:has(> iframe[height="0"]),
+.element-container:has(> iframe[height="0"]) { display: none !important; }
+/* ── Tips: round icon button left of the theme toggle ─────────────────── */
+.st-key-tips_pop {
+    position: fixed !important; top: .65rem; right: calc(1rem + 98px); z-index: 1000000; width: auto !important;
+}
+.st-key-tips_pop button {
+    position: relative; width: 36px !important; height: 36px !important; min-height: 36px !important;
+    padding: 0 !important; border-radius: 50% !important;
+    background: var(--sl-surface) !important; border: 1px solid var(--sl-glass-edge) !important;
+    box-shadow: var(--sl-shadow-lg); transition: transform .2s ease;
+}
+.st-key-tips_pop button > * { display: none !important; }
+.st-key-tips_pop button::before {
+    content: ""; position: absolute; inset: 0; margin: auto; width: 17px; height: 17px;
+    background: #F59E0B;
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2 3 14h9l-1 8 10-12h-9l1-8z'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M13 2 3 14h9l-1 8 10-12h-9l1-8z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.st-key-tips_pop button:hover { transform: translateY(-1px) rotate(-8deg); }
+.st-key-details_on, .st-key-details_off {
+    position: fixed !important; top: .65rem; right: calc(1rem + 98px + 44px); z-index: 1000000; width: auto !important;
+}
+.st-key-details_on button, .st-key-details_off button {
+    position: relative; width: 36px !important; height: 36px !important; min-height: 36px !important;
+    padding: 0 !important; border-radius: 50% !important;
+    background: var(--sl-surface) !important; border: 1px solid var(--sl-glass-edge) !important;
+    box-shadow: var(--sl-shadow-lg); transition: transform .2s ease, background .2s ease;
+}
+.st-key-details_on button > *, .st-key-details_off button > * { display: none !important; }
+.st-key-details_on button::before, .st-key-details_off button::before {
+    content: ""; position: absolute; inset: 0; margin: auto; width: 16px; height: 16px;
+    background: var(--sl-muted);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1'/%3E%3Cpath d='M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1'/%3E%3Cpath d='M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.st-key-details_on button { background: var(--sl-accent) !important; border-color: var(--sl-accent) !important; }
+.st-key-details_on button::before { background: var(--sl-on-accent); }
+.st-key-details_on button:hover, .st-key-details_off button:hover { transform: translateY(-1px); }
+[data-testid="stPopoverBody"]:has(.sl-tips) { width: 320px; max-width: 90vw; }
+.sl-tips-title { display: flex; align-items: center; gap: .4rem; font-weight: 700; font-size: .9rem; margin-bottom: .5rem; color: var(--sl-text); }
+.sl-tips-title svg { color: #F59E0B; }
+.sl-tips-row { display: flex; gap: .6rem; align-items: flex-start; padding: .45rem 0; border-top: 1px solid var(--sl-border); font-size: .82rem; line-height: 1.45; color: var(--sl-text); }
+.sl-tips-row code {
+    flex-shrink: 0; min-width: 2.6rem; text-align: center; font-size: .72rem; font-weight: 700;
+    padding: .1rem .35rem; border-radius: 6px; background: var(--sl-accent-soft); color: var(--sl-accent-text);
+}
 .sl-upload-hint {
     font-size: .72rem; line-height: 1.45; color: var(--sl-text); opacity: .72;
     margin: .45rem 0 .2rem; text-align: center;
@@ -1121,6 +1173,32 @@ def _serialize_state(values: dict) -> dict:
         else:
             out[k] = v
     return out
+
+
+def scroll_to_bottom() -> None:
+    """Jump the chat to the bottom (e.g. after sending while scrolled up).
+
+    components.html runs in a same-origin iframe, so it can scroll the app page.
+    Retries briefly because new elements are still being laid out.
+    """
+    components.html(
+        """
+        <script>
+        const doc = window.parent.document;
+        const scroll = () => {
+          const targets = [
+            doc.querySelector('[data-testid="stMain"]'),
+            doc.querySelector('[data-testid="stAppViewContainer"]'),
+            doc.scrollingElement,
+          ];
+          for (const el of targets) { if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }); }
+        };
+        scroll();
+        [150, 400, 900].forEach(t => setTimeout(scroll, t));
+        </script>
+        """,
+        height=0,
+    )
 
 
 def md_text(text: str) -> str:
@@ -1897,12 +1975,36 @@ with st.sidebar:
     else:
         st.caption("No documents yet. Add files, web pages, or ArXiv papers above.")
 
+
+# ── Tips (round ⚡ button next to the theme toggle) ─────────────────────────────
+with st.popover("Tips", key="tips_pop", help="Tips"):
     st.markdown(
-        '<div class="sl-side-title">Tip</div>'
-        '<div class="sl-tip">Start a message with <code>/btw</code> for a quick side question '
-        "that isn't saved to the chat.</div>",
+        f"""
+        <div class="sl-tips">
+          <div class="sl-tips-title">{icon("sparkle", 14)} Quick tips</div>
+          <div class="sl-tips-row"><code>/btw</code><span>Start a message with <b>/btw</b> for a quick side question
+          that isn't saved to the chat.</span></div>
+          <div class="sl-tips-row"><code>■</code><span>Press the red <b>Stop</b> button in the input box to stop an answer.</span></div>
+          <div class="sl-tips-row"><code>PDF</code><span>Click a document in the sidebar to read it right here.</span></div>
+          <div class="sl-tips-row"><code>15p</code><span>Research papers only, up to {MAX_PAPER_PAGES} pages and {MAX_UPLOAD_MB} MB.</span></div>
+        </div>
+        """,
         unsafe_allow_html=True,
     )
+
+# ── Answer details on/off (round button next to Tips) ──────────────────────────
+details_on = st.session_state.get("show_details", False)
+if st.button(
+    "Details",
+    key="details_on" if details_on else "details_off",
+    help=(
+        "Answer details are ON (route, retrieved chunks, steps under each answer). Click to turn off for a faster app."
+        if details_on
+        else "Answer details are OFF (faster). Click to show the internal graph state under each answer."
+    ),
+):
+    st.session_state.show_details = not details_on
+    st.rerun()
 
 # ── Theme toggle (pinned to the page's top-right corner via CSS) ──────────────
 is_dark = theme == "dark"
@@ -2011,7 +2113,8 @@ for idx, msg in enumerate(history):
         st.markdown(md_text(msg["content"]))
         if msg["role"] == "assistant":
             render_meta(msg.get("meta"))
-            if msg.get("graph_state"):
+            # Only rendered (and sent to the browser) when the developer toggle is on.
+            if st.session_state.get("show_details") and msg.get("graph_state"):
                 with st.expander("Details", expanded=False, icon=":material/data_object:"):
                     st.json(msg["graph_state"])
 
@@ -2025,6 +2128,7 @@ if prompt:
         with st.chat_message("user", avatar=USER_AVATAR):
             st.markdown('<span class="sl-user"></span>', unsafe_allow_html=True)
             st.markdown(prompt)
+        scroll_to_bottom()
 
         with st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
             if not query:
@@ -2054,6 +2158,7 @@ if prompt:
         with st.chat_message("user", avatar=USER_AVATAR):
             st.markdown('<span class="sl-user"></span>', unsafe_allow_html=True)
             st.markdown(prompt)
+        scroll_to_bottom()
         st.session_state.chats[active_sid].append({"role": "user", "content": prompt})
         st.session_state.turns[active_sid] += 1
         current_turn = st.session_state.turns[active_sid]
@@ -2127,8 +2232,9 @@ if prompt:
                 meta = answer_meta(state_snapshot)
                 render_meta(meta)
 
-                with st.expander("Details", expanded=False, icon=":material/data_object:"):
-                    st.json(state_snapshot)
+                if st.session_state.get("show_details"):
+                    with st.expander("Details", expanded=False, icon=":material/data_object:"):
+                        st.json(state_snapshot)
             except Exception as e:
                 traceback.print_exc()
                 status.update(label="Failed", state="error")
