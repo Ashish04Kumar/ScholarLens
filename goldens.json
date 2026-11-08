@@ -1,0 +1,18 @@
+[
+  {
+    "input": "Imagine syncing camera capture across iOS and Android—how does Gateway control plane coordinate this?",
+    "expected_output": "The Gateway’s WebSocket control plane opens a live channel to each iOS/Android node. When one device requests a camera capture, the Gateway’s session‑management module routes the command to the paired device via its channel connector, triggers the device‑specific capture tool, collects the snapshot, and streams the result back through the same WebSocket to the requesting device. This orchestration keeps the devices in sync without re‑configuring each node."
+  },
+  {
+    "input": "Evaluate local-first design's effect on GDPR data residency & deletion.",
+    "expected_output": "A local‑first design keeps data on the user’s own device, which eliminates cross‑border transfers and helps satisfy GDPR’s data‑residency requirement. However, it does not remove the obligation to manage data retention, deletion, and protection. The platform must still enforce GDPR‑compliant policies for how long data is kept, how it is securely deleted, and how it is protected against unauthorized access."
+  },
+  {
+    "input": "List main security concerns for M oltbot: no perfect security, ongoing vigilance, tech skill reqs.",
+    "expected_output": "1. No perfect security; 2. Requires ongoing vigilance; 3. Demands technical skill for setup and maintenance."
+  },
+  {
+    "input": "Compare Moltbot's star growth over 3 months to its 24h spike.",
+    "expected_output": "Moltbot gained over 100,000 stars in just three months, while its single‑day spike was 17,830 stars—roughly 18% of the total 3‑month growth."
+  }
+]

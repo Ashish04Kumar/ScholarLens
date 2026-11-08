@@ -1,0 +1,17 @@
+# Default (light) theme. app.py switches these at runtime via the top-right toggle.
+[theme]
+base = "light"
+primaryColor = "#0D9488"
+backgroundColor = "#F6F8F7"
+secondaryBackgroundColor = "#EEF2F1"
+textColor = "#0F1F1C"
+borderColor = "#E1E7E5"
+font = "Inter, sans-serif"
+baseRadius = "medium"
+showWidgetBorder = true
+
+[theme.sidebar]
+backgroundColor = "#F1F5F4"
+
+[client]
+toolbarMode = "minimal"
