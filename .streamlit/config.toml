@@ -15,3 +15,7 @@ backgroundColor = "#F1F5F4"
 
 [client]
 toolbarMode = "minimal"
+
+[server]
+# Hard per-file upload limit (MB); app.py also checks MAX_UPLOAD_MB.
+maxUploadSize = 10

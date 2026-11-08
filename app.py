@@ -11,7 +11,7 @@ from pathlib import Path
 
 import streamlit as st
 import streamlit.components.v1 as components
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessageChunk, HumanMessage
 
 from backend.btw_handler import handle_btw
 from backend.llm import FallbackLLM
@@ -68,6 +68,7 @@ ICONS = {
     "search": '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
     "globe": '<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z"/>',
     "download": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>',
+    "chat": '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
     "alert": '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
     "sparkle": '<path d="M12 3l1.9 5.8L20 10.7l-6.1 1.9L12 18.5l-1.9-5.9L4 10.7l6.1-1.9z"/>',
 }
@@ -79,6 +80,8 @@ def icon(name: str, size: int = 14) -> str:
 
 ROUTE_BADGES = {
     "retrieve": ("file", "From your papers"),
+    "retrieve_web": ("globe", "From the web"),
+    "retrieve_both": ("file", "Your papers + web"),
     "verify_claim": ("shield", "Claim check"),
     "direct_answer": ("bulb", "General knowledge"),
 }
@@ -488,6 +491,140 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 .st-key-new_chat button > div, .st-key-btn_add_files button > div,
 .st-key-btn_load_urls button > div, .st-key-btn_load_arxiv button > div { justify-content: center !important; }
 .st-key-chat_list { overflow-x: clip !important; }
+.sl-group {
+    font-size: .68rem; font-weight: 600; letter-spacing: .04em; color: var(--sl-muted);
+    margin: .55rem 0 .15rem .35rem;
+}
+.st-key-chat_list .sl-group:first-child { margin-top: .1rem; }
+/* While answering, the send button turns into a Stop button (same spot, same size) */
+[data-testid="stBottomBlockContainer"] { position: relative; }
+[data-testid="stBottom"]:has(.st-key-stop_gen) [data-testid="stChatInputSubmitButton"] { visibility: hidden; }
+.st-key-stop_gen {
+    position: absolute !important; z-index: 5; width: auto !important; margin: 0 !important;
+    right: calc(1rem + 17px); bottom: calc(.9rem + 13px);
+}
+.st-key-stop_gen button {
+    position: relative;
+    width: 32px !important; height: 32px !important; min-height: 32px !important; padding: 0 !important;
+    border-radius: 10px !important; border: none !important; box-shadow: none !important;
+    background: #DC2626 !important; transition: transform .15s ease, background .15s ease;
+}
+.st-key-stop_gen button [data-testid="stIconMaterial"], .st-key-stop_gen button p { display: none !important; }
+.st-key-stop_gen button::after {
+    content: ""; position: absolute; top: 50%; left: 50%;
+    width: 11px; height: 11px; border-radius: 2.5px;
+    background: #FFFFFF; transform: translate(-50%, -50%);
+}
+.st-key-stop_gen button:hover { background: #B91C1C !important; transform: scale(1.05); }
+/* ── Chat cards in the sidebar ─────────────────────────────────────────── */
+[class*="st-key-chatrow_"] { position: relative; margin-bottom: .3rem; }
+[class*="st-key-chatrow_"] [data-testid="stVerticalBlock"] { gap: 0 !important; }
+.sl-chatcard {
+    display: flex; align-items: center; gap: .65rem;
+    padding: .55rem 2.4rem .55rem .55rem; border-radius: 12px;
+    border: 1px solid transparent; transition: background .15s ease, border-color .15s ease;
+}
+[class*="st-key-chatrow_idle_"]:hover .sl-chatcard {
+    background: var(--sl-surface-solid); border-color: var(--sl-border); box-shadow: var(--sl-shadow);
+}
+.sl-chat-ico {
+    width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0; display: grid; place-items: center;
+    color: var(--sl-muted); background: var(--sl-surface-2); transition: color .15s ease, background .15s ease;
+}
+[class*="st-key-chatrow_idle_"]:hover .sl-chat-ico { color: var(--sl-accent); background: var(--sl-accent-soft); }
+.sl-chat-txt { min-width: 0; }
+.sl-chat-name {
+    font-size: .86rem; font-weight: 550; color: var(--sl-text); line-height: 1.3;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.sl-chat-sub { font-size: .72rem; color: var(--sl-muted); margin-top: .1rem; }
+.sl-chatcard.is-active {
+    background: var(--sl-surface-solid); border-color: var(--sl-accent);
+    box-shadow: 0 0 0 3px var(--sl-accent-soft);
+}
+.sl-chatcard.is-active .sl-chat-ico { color: #FFFFFF; background: var(--sl-accent); }
+.sl-chatcard.is-active .sl-chat-name { font-weight: 700; }
+.sl-chatcard.is-active .sl-chat-sub { color: var(--sl-accent-text); font-weight: 500; }
+/* invisible full-card click target */
+[class*="st-key-chatrow_"] [class*="st-key-open_"] {
+    position: absolute !important; inset: 0; z-index: 1; margin: 0 !important;
+}
+[class*="st-key-chatrow_"] [class*="st-key-open_"] button {
+    width: 100% !important; height: 100% !important; min-height: 0 !important;
+    opacity: 0 !important; cursor: pointer !important;
+}
+[class*="st-key-chatrow_active_"] [class*="st-key-open_"] button { cursor: default !important; }
+/* delete icon on the right, above the click target */
+[class*="st-key-chatrow_"] [class*="st-key-trash_"] {
+    position: absolute !important; right: .4rem; top: 50%; transform: translateY(-50%);
+    z-index: 2; width: auto !important; margin: 0 !important;
+}
+[class*="st-key-chatrow_"] [class*="st-key-trash_"] button { opacity: 0; transition: opacity .15s ease; }
+[class*="st-key-chatrow_"]:hover [class*="st-key-trash_"] button,
+[class*="st-key-chatrow_active_"] [class*="st-key-trash_"] button { opacity: .6; }
+[class*="st-key-chatrow_"] [class*="st-key-trash_"] button:hover { opacity: 1 !important; }
+@media (hover: none) { [class*="st-key-chatrow_"] [class*="st-key-trash_"] button { opacity: .6; } }
+.sl-upload-hint {
+    font-size: .72rem; line-height: 1.45; color: var(--sl-text); opacity: .72;
+    margin: .45rem 0 .2rem; text-align: center;
+}
+/* File uploader: just a full-width Upload button (no drop box, no instructions) */
+[class*="st-key-uploader_"] [data-testid="stFileUploaderDropzone"] {
+    border: none !important; background: transparent !important; padding: 0 !important; min-height: 0 !important;
+}
+[class*="st-key-uploader_"] [data-testid="stFileUploaderDropzoneInstructions"] { display: none !important; }
+[class*="st-key-uploader_"] [data-testid="stFileUploaderDropzone"] > span,
+[class*="st-key-uploader_"] [data-testid="stFileUploaderDropzone"] > div { width: 100%; }
+[class*="st-key-uploader_"] [data-testid="stFileUploaderDropzone"] button {
+    width: 100% !important; min-height: 40px !important; border-radius: 12px !important;
+    justify-content: center !important;
+    background: var(--sl-accent) !important; color: var(--sl-on-accent) !important; border: none !important;
+    box-shadow: var(--sl-shadow-accent); transition: background .15s ease;
+}
+[class*="st-key-uploader_"] [data-testid="stFileUploaderDropzone"] button:hover { background: var(--sl-accent-hover) !important; }
+[class*="st-key-uploader_"] [data-testid="stFileUploaderDropzone"] button p,
+[class*="st-key-uploader_"] [data-testid="stFileUploaderDropzone"] button span,
+[class*="st-key-uploader_"] [data-testid="stFileUploaderDropzone"] button svg {
+    color: var(--sl-on-accent) !important; fill: currentColor; font-weight: 600 !important;
+}
+.sl-interrupted {
+    display: flex; align-items: flex-start; gap: .5rem;
+    font-size: .88rem; line-height: 1.5; color: var(--sl-muted);
+}
+.sl-interrupted svg { color: #D97706; flex-shrink: 0; margin-top: 3px; }
+[class*="st-key-retry_"] button {
+    margin-top: .5rem; min-height: 34px !important; border-radius: 10px !important;
+    background: var(--sl-accent) !important; border: none !important;
+}
+[class*="st-key-retry_"] button p, [class*="st-key-retry_"] button [data-testid="stIconMaterial"] {
+    color: var(--sl-on-accent) !important; font-weight: 600 !important;
+}
+.sl-empty-list { font-size: .8rem; color: var(--sl-muted); padding: .6rem .4rem; }
+/* chat rows */
+.st-key-chat_list [data-testid="stHorizontalBlock"] {
+    border-radius: 10px; padding: 1px 2px; transition: background .15s ease;
+}
+.st-key-chat_list [data-testid="stHorizontalBlock"]:hover { background: var(--sl-surface-2); }
+[class*="st-key-sess_"] button {
+    min-height: 36px !important; padding: .35rem .6rem !important; border-radius: 9px !important;
+    background: transparent !important; border: none !important; box-shadow: none !important;
+}
+[class*="st-key-sess_"] button [data-testid="stIconMaterial"] { color: var(--sl-muted); font-size: 1.05rem; }
+[class*="st-key-sess_"] button p { font-size: .86rem !important; font-weight: 450 !important; color: var(--sl-text) !important; }
+/* active chat: accent bar + tint */
+.st-key-chat_list [data-testid="stHorizontalBlock"]:has([class*="st-key-sess_active_"]) {
+    background: var(--sl-accent-soft); box-shadow: inset 3px 0 0 var(--sl-accent);
+}
+[class*="st-key-sess_active_"] button { cursor: default !important; }
+[class*="st-key-sess_active_"] button p { font-weight: 650 !important; color: var(--sl-accent-text) !important; }
+[class*="st-key-sess_active_"] button [data-testid="stIconMaterial"] { color: var(--sl-accent) !important; }
+/* trash only on row hover (always visible on touch screens) */
+.st-key-chat_list [class*="st-key-trash_"] button { opacity: 0; transition: opacity .15s ease; }
+.st-key-chat_list [data-testid="stHorizontalBlock"]:hover [class*="st-key-trash_"] button,
+.st-key-chat_list [data-testid="stHorizontalBlock"]:has([class*="st-key-sess_active_"]) [class*="st-key-trash_"] button { opacity: .6; }
+.st-key-chat_list [class*="st-key-trash_"] button:hover { opacity: 1 !important; }
+@media (hover: none) { .st-key-chat_list [class*="st-key-trash_"] button { opacity: .6; } }
+.st-key-chat_search input { font-size: .84rem; }
 .st-key-chat_list [data-testid="stHorizontalBlock"] { gap: .25rem !important; flex-wrap: nowrap !important; }
 .st-key-chat_list [data-testid="stColumn"] { min-width: 0 !important; }
 [class*="st-key-trash_"] button {
@@ -559,12 +696,15 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 .sl-notice-text { font-size: .83rem; line-height: 1.5; color: var(--sl-muted); }
 .st-key-scope_info button {
     justify-content: flex-start !important; min-height: 34px !important;
+    padding: .4rem .9rem !important;
     border-radius: 12px !important; margin-bottom: .55rem;
     background: rgba(217,119,6,0.09) !important;
     border: 1px solid rgba(217,119,6,0.35) !important;
 }
 .st-key-scope_info button:hover { background: rgba(217,119,6,0.16) !important; }
-.st-key-scope_info button p { font-size: .8rem !important; font-weight: 600 !important; color: #B45309 !important; }
+.st-key-scope_info button > div { gap: .5rem !important; }
+.st-key-scope_info button p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-key-scope_info button p { font-size: .78rem !important; font-weight: 600 !important; color: #B45309 !important; }
 .st-key-scope_info button [data-testid="stIconMaterial"] { color: #D97706 !important; }
 
 /* ── Full-screen loader while a source is being added ──────────────────── */
@@ -693,7 +833,7 @@ div[role="dialog"] { border-radius: 20px !important; }
     background: var(--sl-surface-solid) !important; border: 1px solid var(--sl-border-strong) !important;
 }
 .sl-or {
-    text-align: center; font-size: .72rem; color: var(--sl-muted); margin: .45rem 0 .35rem;
+    text-align: center; font-size: .72rem; color: var(--sl-text); opacity: .72; margin: .45rem 0 .35rem;
     display: flex; align-items: center; gap: .5rem;
 }
 .sl-or::before, .sl-or::after { content: ""; flex: 1; height: 1px; background: var(--sl-border-strong); }
@@ -989,6 +1129,7 @@ def md_text(text: str) -> str:
 
 
 MAX_PAPER_PAGES = 15
+MAX_UPLOAD_MB = 10  # keep in sync with server.maxUploadSize in .streamlit/config.toml
 
 SCOPE_NOTICE_TITLE = "Built for research papers only"
 SCOPE_NOTICE_TEXT = (
@@ -1296,12 +1437,21 @@ def answer_meta(state: dict) -> dict:
     """Small summary of a finished turn for the badges under an answer."""
     docs = state.get("retrieved_docs") or []
     sources = []
+    from_web = from_papers = False
     for d in docs:
         md = d.get("metadata", {}) if isinstance(d, dict) else getattr(d, "metadata", {})
+        # Live web-search results carry a "url"; chunks from the user's own sources don't.
+        if md.get("url"):
+            from_web = True
+        else:
+            from_papers = True
         title = md.get("title") or md.get("source") or md.get("url")
         if title and title not in sources:
             sources.append(str(title))
-    return {"route": state.get("route"), "sources": sources[:5]}
+    route = state.get("route")
+    if route == "retrieve":
+        route = "retrieve_both" if from_web and from_papers else "retrieve_web" if from_web else "retrieve"
+    return {"route": route, "sources": sources[:5]}
 
 
 def render_meta(meta: dict | None) -> None:
@@ -1344,6 +1494,46 @@ def maybe_rename_session(session_id: str, first_message: str) -> None:
     st.session_state.sessions_meta[session_id]["name"] = name
     st.session_state.sessions_meta[session_id]["is_named"] = True
     save_sessions(st.session_state.sessions_meta)
+
+
+def chat_group(created_at: str) -> str:
+    """Bucket a chat by when it was started, for the sidebar list."""
+    try:
+        days = (datetime.now().date() - datetime.fromisoformat(created_at).date()).days
+    except ValueError:
+        return "Older"
+    if days <= 0:
+        return "Today"
+    if days == 1:
+        return "Yesterday"
+    if days < 7:
+        return "Previous 7 days"
+    if days < 30:
+        return "Previous 30 days"
+    return "Older"
+
+
+def chat_when(created_at: str) -> str:
+    """Short time label for a chat card: '10:17 PM', 'Yesterday', '08 Nov'."""
+    try:
+        dt = datetime.fromisoformat(created_at)
+    except ValueError:
+        return ""
+    days = (datetime.now().date() - dt.date()).days
+    if days <= 0:
+        return dt.strftime("%I:%M %p").lstrip("0")
+    if days == 1:
+        return "Yesterday"
+    if days < 7:
+        return dt.strftime("%A")
+    return dt.strftime("%d %b")
+
+
+def chat_started(created_at: str) -> str:
+    try:
+        return datetime.fromisoformat(created_at).strftime("%d %b %Y, %I:%M %p")
+    except ValueError:
+        return "earlier"
 
 
 def create_session() -> str:
@@ -1402,6 +1592,13 @@ def load_session_chats(session_id: str) -> list[dict]:
                     continue
                 pending_answer = text
         flush()
+        # The last question never got an answer (page refreshed / closed mid-answer).
+        if chats and chats[-1]["role"] == "user":
+            turn += 1
+            chats.append({
+                "role": "assistant", "content": "", "turn": turn, "graph_state": {},
+                "interrupted": True, "question": chats[-1]["content"],
+            })
         return chats
     except Exception:
         return []
@@ -1497,17 +1694,37 @@ with st.sidebar:
         active_sid = new_sid
         st.rerun()
 
-    st.markdown('<div class="sl-side-title">Recent chats</div>', unsafe_allow_html=True)
     sorted_sessions = sorted(
         st.session_state.sessions_meta.values(),
         key=lambda s: s["created_at"],
         reverse=True,
     )
+    st.markdown(
+        f'<div class="sl-side-title">Recent chats<span class="sl-count">{len(sorted_sessions)}</span></div>',
+        unsafe_allow_html=True,
+    )
+    if len(sorted_sessions) > 5:
+        chat_query = st.text_input(
+            "Search chats", key="chat_search", placeholder="Search chats…",
+            label_visibility="collapsed", icon=":material/search:",
+        ).strip().lower()
+        if chat_query:
+            sorted_sessions = [x for x in sorted_sessions if chat_query in x["name"].lower()]
+
     pending_delete = st.session_state.get("pending_delete")
-    with st.container(height=min(280, 46 * max(len(sorted_sessions), 1) + 10), border=False, key="chat_list"):
+    # Fixed height (with its own scroll) only once the list is long; otherwise fit the content.
+    list_height = 300 if len(sorted_sessions) > 6 else "content"
+    with st.container(height=list_height, border=False, key="chat_list"):
+        if not sorted_sessions:
+            st.markdown('<div class="sl-empty-list">No chats match your search.</div>', unsafe_allow_html=True)
+        current_group = None
         for session in sorted_sessions:
             sid = session["id"]
             is_active = sid == st.session_state.active_session_id
+            group = chat_group(session["created_at"])
+            if group != current_group:
+                current_group = group
+                st.markdown(f'<div class="sl-group">{group}</div>', unsafe_allow_html=True)
             if pending_delete == sid:
                 st.markdown(
                     f'<div class="sl-confirm">Delete <b>{html.escape(session["name"])}</b>? '
@@ -1524,21 +1741,24 @@ with st.sidebar:
                     st.session_state.pending_delete = None
                     st.rerun()
                 continue
-            c_name, c_del = st.columns([6, 1], gap="small", vertical_alignment="center")
-            if c_name.button(
-                session["name"],
-                key=f"sess_{sid}",
-                icon=":material/chat_bubble:" if is_active else ":material/chat_bubble_outline:",
-                use_container_width=True,
-                type="secondary",
-                disabled=is_active,
-            ):
-                with st.spinner("Opening chat…"):
-                    switch_session(sid)
-                st.rerun()
-            if c_del.button("", key=f"trash_{sid}", icon=":material/delete:", help="Delete chat"):
-                st.session_state.pending_delete = sid
-                st.rerun()
+            # Card drawn in HTML; an invisible full-size button on top makes it clickable.
+            with st.container(key=f"chatrow_{'active' if is_active else 'idle'}_{sid}"):
+                st.markdown(
+                    f'<div class="sl-chatcard{" is-active" if is_active else ""}">'
+                    f'<div class="sl-chat-ico">{icon("chat", 15)}</div>'
+                    f'<div class="sl-chat-txt"><div class="sl-chat-name">{html.escape(session["name"])}</div>'
+                    f'<div class="sl-chat-sub">{chat_when(session["created_at"])}'
+                    f'{" · open" if is_active else ""}</div></div></div>',
+                    unsafe_allow_html=True,
+                )
+                if st.button(session["name"], key=f"open_{sid}", use_container_width=True,
+                             help=f"Started {chat_started(session['created_at'])}") and not is_active:
+                    with st.spinner("Opening chat…"):
+                        switch_session(sid)
+                    st.rerun()
+                if st.button("", key=f"trash_{sid}", icon=":material/delete:", help="Delete chat"):
+                    st.session_state.pending_delete = sid
+                    st.rerun()
 
     st.markdown('<div class="sl-side-title">Add sources</div>', unsafe_allow_html=True)
     if st.button(
@@ -1559,23 +1779,40 @@ with st.sidebar:
     # ── Files ──────────────────────────────────────────────────────────────────
     with tab_files:
         suggestion_card("file")
+        # Loading starts as soon as files are picked. The uploader key changes after each
+        # batch so it clears itself and the same files aren't picked up again.
+        uploader_n = st.session_state.get(f"uploader_n_{active_sid}", 0)
         uploaded_files = st.file_uploader(
-            "PDF, TXT, or Markdown",
+            f"PDF, TXT or Markdown · max {MAX_UPLOAD_MB} MB",
             type=["pdf", "txt", "md", "markdown"],
             accept_multiple_files=True,
-            key=f"uploader_{active_sid}",
+            key=f"uploader_{active_sid}_{uploader_n}",
             label_visibility="collapsed",
+            help=f"Research papers only · max {MAX_UPLOAD_MB} MB and {MAX_PAPER_PAGES} pages per file",
         )
-        if st.button("Add files", use_container_width=True, key="btn_add_files",
-                     help=f"Upload academic research papers (PDF, TXT or Markdown), up to {MAX_PAPER_PAGES} pages each."):
-            if uploaded_files:
-                done = st.session_state.get(f"processed_files_{active_sid}", set())
-                new = [(f.name, f.getvalue()) for f in uploaded_files if f.name not in done]
-                if new:
-                    queue_load("file", new)
-                st.info("These files are already loaded.")
-            else:
-                st.warning("No files selected.")
+        st.markdown(
+            f'<div class="sl-upload-hint">PDF, TXT or Markdown · max {MAX_UPLOAD_MB} MB · '
+            f"up to {MAX_PAPER_PAGES} pages · uploads start automatically</div>",
+            unsafe_allow_html=True,
+        )
+        if uploaded_files:
+            done = st.session_state.get(f"processed_files_{active_sid}", set())
+            new, too_big = [], []
+            for f in uploaded_files:
+                if f.size > MAX_UPLOAD_MB * 1024 * 1024:
+                    too_big.append(f"{f.name} ({f.size / 1024 / 1024:.1f} MB)")
+                elif f.name not in done:
+                    new.append((f.name, f.getvalue()))
+            st.session_state[f"uploader_n_{active_sid}"] = uploader_n + 1
+            for name in too_big:
+                st.session_state.setdefault("source_errors", []).append(
+                    f"Skipped {name}: files must be {MAX_UPLOAD_MB} MB or smaller."
+                )
+            if new:
+                queue_load("file", new)
+            if not too_big:
+                st.toast("These files are already loaded.", icon=":material/info:")
+            st.rerun()
 
     # ── Web pages ──────────────────────────────────────────────────────────────
     with tab_web:
@@ -1690,6 +1927,16 @@ if viewing:
         st.rerun()
     st.stop()
 
+# ── Stopped answer (Stop clicked while generating) ─────────────────────────────
+partial = st.session_state.pop("_partial", None)
+if st.session_state.get("stop_gen") and partial and partial["session_id"] == active_sid:
+    chats = st.session_state.chats.setdefault(active_sid, [])
+    chats.append({
+        "role": "assistant", "content": partial["text"], "turn": partial["turn"],
+        "graph_state": {}, "stopped": True,
+        "question": next((m["content"] for m in reversed(chats) if m["role"] == "user"), ""),
+    })
+
 # ── Chat input (read first so example buttons and typed messages share one path) ─
 typed_prompt = st.chat_input("Ask about your papers, verify a claim, or search the web…")
 prompt = typed_prompt or st.session_state.pop("pending_prompt", None)
@@ -1728,11 +1975,39 @@ if not history and not prompt:
 else:
     welcome_slot.empty()
 
-for msg in history:
+for idx, msg in enumerate(history):
     avatar = USER_AVATAR if msg["role"] == "user" else ASSISTANT_AVATAR
     with st.chat_message(msg["role"], avatar=avatar):
         if msg["role"] == "user":
             st.markdown('<span class="sl-user"></span>', unsafe_allow_html=True)
+        if msg.get("stopped"):
+            if msg["content"]:
+                st.markdown(md_text(msg["content"]))
+            st.markdown(
+                f'<div class="sl-interrupted">{icon("alert", 15)} You stopped this answer.</div>',
+                unsafe_allow_html=True,
+            )
+            if idx == len(history) - 1 and msg.get("question") and st.button(
+                "Regenerate", key=f"retry_{idx}", icon=":material/refresh:"
+            ):
+                history.pop()
+                st.session_state.pending_prompt = msg["question"]
+                st.session_state.retry_question = True
+                st.rerun()
+            continue
+        if msg.get("interrupted"):
+            st.markdown(
+                f'<div class="sl-interrupted">{icon("alert", 15)} This answer was interrupted '
+                "because the page was refreshed or closed while it was being written.</div>",
+                unsafe_allow_html=True,
+            )
+            if idx == len(history) - 1 and st.button("Retry this question", key=f"retry_{idx}",
+                                                     icon=":material/refresh:"):
+                history.pop()
+                st.session_state.pending_prompt = msg["question"]
+                st.session_state.retry_question = True
+                st.rerun()
+            continue
         st.markdown(md_text(msg["content"]))
         if msg["role"] == "assistant":
             render_meta(msg.get("meta"))
@@ -1772,6 +2047,10 @@ if prompt:
 
         is_first_message = len(st.session_state.chats[active_sid]) == 0
 
+        if st.session_state.pop("retry_question", False):
+            # Retrying an interrupted question: it is already the last message shown.
+            if st.session_state.chats[active_sid] and st.session_state.chats[active_sid][-1]["role"] == "user":
+                st.session_state.chats[active_sid].pop()
         with st.chat_message("user", avatar=USER_AVATAR):
             st.markdown('<span class="sl-user"></span>', unsafe_allow_html=True)
             st.markdown(prompt)
@@ -1801,6 +2080,13 @@ if prompt:
         with st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
             status = st.status("Thinking…", expanded=False)
             placeholder = st.empty()
+            # Clicking any widget during a run makes Streamlit stop it and rerun; the
+            # next run sees stop_gen=True and keeps whatever was written so far.
+            # Drawn in the bottom bar (same container as the chat input) and pinned by CSS
+            # inside the input box, next to the send button.
+            stop_slot = st._bottom.empty()
+            stop_slot.button("", key="stop_gen", icon=":material/stop:", help="Stop generating")
+            st.session_state._partial = {"session_id": active_sid, "text": "", "turn": current_turn}
             response_text = ""
             current_node = None
             state_snapshot, meta = None, None
@@ -1813,17 +2099,22 @@ if prompt:
                     if node != current_node and node in NODE_STATUS and not response_text:
                         current_node = node
                         status.update(label=NODE_STATUS[node])
+                    # Only streamed token chunks: the node's final AIMessage is emitted
+                    # again in "messages" mode and would duplicate the answer.
                     if (
                         node == "generate_answer"
-                        and hasattr(chunk, "text")
+                        and isinstance(chunk, AIMessageChunk)
                         and chunk.text
                     ):
                         if not response_text:
                             status.update(label="Done", state="complete")
                         response_text += chunk.text
+                        st.session_state._partial["text"] = response_text
                         placeholder.markdown(md_text(response_text) + "▌")
 
                 status.update(label="Done", state="complete")
+                stop_slot.empty()
+                st.session_state.pop("_partial", None)
 
                 if not response_text:
                     final_values = graph.get_state(config).values
