@@ -2,7 +2,6 @@ import html
 import json
 import random
 import shutil
-import urllib.request
 import tempfile
 import traceback
 import uuid
@@ -1008,23 +1007,35 @@ body:has([data-baseweb="modal"]) .st-key-details_off { visibility: hidden; }
     /* Header bar holding the menu button, brand and the three action buttons */
     .sl-mobile-header {
         display: flex; align-items: center;
-        position: fixed; top: 0; left: 0; right: 0; height: 56px; z-index: 999980;
-        padding: 0 .75rem 0 3.4rem;
+        position: fixed; top: 0; left: 0; right: 0; height: 54px; z-index: 999980;
+        padding: 0 .75rem;
         background: var(--sl-surface-solid);
         border-bottom: 1px solid var(--sl-border);
         box-shadow: var(--sl-shadow);
     }
     .sl-mh-brand { display: flex; align-items: center; gap: .5rem; font-weight: 700; font-size: 1rem; color: var(--sl-text); letter-spacing: -0.02em; }
-    .sl-mh-logo { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: var(--sl-accent); color: var(--sl-on-accent); }
+    .sl-mh-logo { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--sl-accent); color: var(--sl-on-accent); }
+    .sl-mh-chev { color: var(--sl-muted); font-size: 1.2rem; font-weight: 500; margin-left: -.1rem; line-height: 1; }
+    /* The "open sidebar" button sits invisibly over the logo + name: tap the logo to open the menu */
     [data-testid="stExpandSidebarButton"] {
-        position: fixed !important; top: 10px; left: .6rem; z-index: 999990;
-        width: 36px; height: 36px; box-shadow: none !important;
+        position: fixed !important; top: 7px; left: .5rem; z-index: 999990;
+        width: 160px !important; height: 40px !important;
+        opacity: 0 !important; box-shadow: none !important; border: none !important;
     }
-    .st-key-theme_toggle { top: 10px; right: .6rem; z-index: 999990; }
-    .st-key-theme_toggle button { padding: .25rem .7rem !important; box-shadow: none; }
-    .st-key-tips_pop { top: 10px; right: calc(.6rem + 84px); z-index: 999990; }
-    .st-key-details_on, .st-key-details_off { top: 10px; right: calc(.6rem + 84px + 42px); z-index: 999990; }
-    .st-key-tips_pop button, .st-key-details_on button, .st-key-details_off button { box-shadow: none; }
+
+    /* Three round 34px buttons, flush right, 6px apart */
+    .st-key-theme_toggle, .st-key-tips_pop, .st-key-details_on, .st-key-details_off { top: 11px !important; z-index: 999990; }
+    .st-key-theme_toggle { right: .75rem !important; }
+    .st-key-tips_pop { right: calc(.75rem + 34px) !important; }
+    .st-key-details_on, .st-key-details_off { right: calc(.75rem + 68px) !important; }
+    .st-key-theme_toggle button, .st-key-tips_pop button, .st-key-details_on button, .st-key-details_off button {
+        width: 32px !important; height: 32px !important; min-height: 32px !important;
+        padding: 0 !important; border-radius: 50% !important; box-shadow: none !important;
+        justify-content: center !important;
+        border: 1px solid var(--sl-border-strong) !important;
+    }
+    .st-key-theme_toggle button p { display: none !important; }
+    .st-key-theme_toggle button [data-testid="stIconMaterial"] { margin: 0 !important; font-size: 1.1rem !important; }
 
     /* Sidebar opens full screen and covers the header + its buttons */
     [data-testid="stSidebar"][aria-expanded="true"] {
@@ -1362,10 +1373,11 @@ def _load_arxiv_into(session_id: str, query: str, progress) -> str:
     progress(0.25, f"Split into {len(docs)} chunks")
     _index(docs, session_id, progress, 0.25, 0.9)
     pdf_url = docs[0].metadata.get("pdf_url") if docs else None
+    cached = docs[0].metadata.get("pdf_cache_path") if docs else None
     progress(0.92, "Saving the PDF for the viewer")
-    if pdf_url:
-        with urllib.request.urlopen(pdf_url, timeout=60) as resp:
-            pdf_path = store_file(session_id, f"{pdf_url.rsplit('/', 1)[-1]}.pdf", resp.read())
+    if pdf_url and cached and Path(cached).exists():
+        # Reuse the PDF the loader already downloaded (no second request to arXiv).
+        pdf_path = store_file(session_id, f"{pdf_url.rsplit('/', 1)[-1]}.pdf", Path(cached).read_bytes())
         save_source(session_id, docs[0].metadata["title"], "file", path=pdf_path, url=pdf_url)
     return docs[0].metadata.get("title") if docs else query
 
@@ -1408,6 +1420,8 @@ def queue_load(kind: str, items: list) -> None:
     Rerunning first also closes any open dialog, so nothing stays clickable underneath.
     """
     st.session_state.pending_load = {"kind": kind, "items": items, "session_id": st.session_state.active_session_id}
+    # On phones the sidebar is full screen and would hide the loader; close it first.
+    st.session_state._close_sidebar_mobile = True
     st.rerun()
 
 
@@ -1968,8 +1982,9 @@ with st.sidebar:
     ):
         scope_dialog(active_sid)
     # Load failures are stored before st.rerun() so they survive the rerun.
+    # Load / delete failures show as toasts (they survive the rerun via session state).
     for err in st.session_state.pop("source_errors", []):
-        st.error(err)
+        st.toast(err, icon=":material/error:")
     tab_files, tab_web, tab_arxiv = st.tabs(
         [":material/upload_file: Files", ":material/language: Web", ":material/school: ArXiv"]
     )
@@ -2109,7 +2124,8 @@ if st.session_state.pop("_close_sidebar_mobile", False):
 # ── Mobile header bar (hidden on desktop; the 3 round buttons sit on it) ──────────
 st.markdown(
     f'<div class="sl-mobile-header"><div class="sl-mh-brand">'
-    f'<span class="sl-mh-logo">{icon("book", 14)}</span>ScholarLens</div></div>',
+    f'<span class="sl-mh-logo">{icon("book", 14)}</span>ScholarLens'
+    f'<span class="sl-mh-chev">›</span></div></div>',
     unsafe_allow_html=True,
 )
 

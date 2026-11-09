@@ -1,5 +1,8 @@
+import os
 import re
 import tempfile
+import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from functools import lru_cache
@@ -92,11 +95,48 @@ def _extract_arxiv_id(query: str) -> str | None:
     return None
 
 
+# arXiv asks clients to identify themselves and rate-limits by IP (HTTP 429).
+_HTTP_HEADERS = {"User-Agent": f"ScholarLens/1.0 ({os.getenv('USER_AGENT', 'research paper assistant')})"}
+ARXIV_PDF_CACHE = Path(tempfile.gettempdir()) / "scholarlens_arxiv"
+
+
+def _fetch(url: str, timeout: int) -> bytes:
+    """GET with a proper User-Agent; on 429/503 wait (Retry-After or backoff) and retry."""
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers=_HTTP_HEADERS)
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.read()
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 503):
+                raise
+            if attempt == 2:
+                raise ValueError(
+                    "arXiv is temporarily rate-limiting requests from this server (HTTP 429). "
+                    "Please wait a minute and try again."
+                ) from e
+            retry_after = e.headers.get("Retry-After") if e.headers else None
+            wait = int(retry_after) if retry_after and retry_after.isdigit() else 3 * (attempt + 1)
+            time.sleep(min(wait, 15))
+    raise RuntimeError("unreachable")
+
+
+def arxiv_pdf_path(arxiv_id: str) -> Path:
+    """Download an arXiv PDF once and reuse the cached copy afterwards."""
+    ARXIV_PDF_CACHE.mkdir(parents=True, exist_ok=True)
+    path = ARXIV_PDF_CACHE / f"{arxiv_id.replace('/', '_')}.pdf"
+    if not path.exists() or path.stat().st_size == 0:
+        data = _fetch(f"https://arxiv.org/pdf/{arxiv_id}", timeout=60)
+        tmp = path.with_suffix(".part")
+        tmp.write_bytes(data)
+        tmp.replace(path)
+    return path
+
+
 def _arxiv_api_lookup(arxiv_id: str) -> str:
     """Fetch paper title by ID from the ArXiv Atom API."""
     url = f"https://export.arxiv.org/api/query?id_list={arxiv_id}"
-    with urllib.request.urlopen(url, timeout=10) as resp:
-        xml = resp.read().decode()
+    xml = _fetch(url, timeout=10).decode()
     titles = re.findall(r"<title>(.*?)</title>", xml, re.DOTALL)
     return titles[1].strip() if len(titles) > 1 else arxiv_id
 
@@ -106,8 +146,7 @@ def _arxiv_search(query: str) -> str:
     phrase = query.strip('"')
     search_query = urllib.parse.quote(f'ti:"{phrase}"')
     url = f"https://export.arxiv.org/api/query?search_query={search_query}&max_results=1&sortBy=relevance"
-    with urllib.request.urlopen(url, timeout=15) as resp:
-        xml = resp.read().decode()
+    xml = _fetch(url, timeout=15).decode()
     m = re.search(r"<id>https?://arxiv\.org/abs/(\d{4}\.\d{4,5}(?:v\d+)?)</id>", xml)
     if not m:
         raise ValueError(f"No ArXiv paper found for: {query}")
@@ -117,24 +156,16 @@ def _arxiv_search(query: str) -> str:
 def _load_arxiv_by_id(arxiv_id: str) -> list[Document]:
     """Download and chunk an ArXiv paper PDF by its bare ID."""
     pdf_url = f"https://arxiv.org/pdf/{arxiv_id}"
-    with urllib.request.urlopen(pdf_url, timeout=60) as resp:
-        pdf_bytes = resp.read()
-    tmp_path = None
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
-            tmp.write(pdf_bytes)
-            tmp_path = tmp.name
-        docs = _read_pdf(tmp_path)
-        if not docs:
-            raise ValueError(f"Could not load PDF for ArXiv ID: {arxiv_id}")
-        title = (docs[0].metadata.get("title") or "").strip() or _arxiv_api_lookup(arxiv_id)
-        chunks = _stamp_title(_splitter.split_documents(docs), title)
-        for chunk in chunks:
-            chunk.metadata["pdf_url"] = pdf_url
-        return chunks
-    finally:
-        if tmp_path:
-            Path(tmp_path).unlink(missing_ok=True)
+    pdf_path = arxiv_pdf_path(arxiv_id)
+    docs = _read_pdf(str(pdf_path))
+    if not docs:
+        raise ValueError(f"Could not load PDF for ArXiv ID: {arxiv_id}")
+    title = (docs[0].metadata.get("title") or "").strip() or _arxiv_api_lookup(arxiv_id)
+    chunks = _stamp_title(_splitter.split_documents(docs), title)
+    for chunk in chunks:
+        chunk.metadata["pdf_url"] = pdf_url
+        chunk.metadata["pdf_cache_path"] = str(pdf_path)
+    return chunks
 
 
 def load_arxiv(query: str) -> list[Document]:
