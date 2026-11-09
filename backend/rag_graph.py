@@ -381,7 +381,9 @@ def generate_answer_node(state: RAGState) -> dict:
 
 # ── Graph ─────────────────────────────────────────────────────────────────────
 
-MAX_RETRIEVAL_ATTEMPTS = 3
+# One search per question: each extra round costs another LLM call with the whole
+# context, which is what made answers slow on the free Groq tier.
+MAX_RETRIEVAL_ATTEMPTS = 1
 
 
 def route_query(state: RAGState) -> str:
@@ -395,8 +397,8 @@ def agent_routing(state: RAGState) -> str:
     tc = tools_condition(state)
     if tc == "tools":
         return "retrieval"
-    if state.get("retrieval_attempts", 0) >= MAX_RETRIEVAL_ATTEMPTS:
-        return "generate_answer"
+    # At the cap the agent made no LLM call; still check what the one search found,
+    # so an off-topic result can trigger a single query rewrite.
     return "relevancy_check"
 
 
