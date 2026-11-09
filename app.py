@@ -35,13 +35,13 @@ SESSIONS_FILE = Path("sessions.json")
 
 # Loader text shown while each graph node is running, before the answer streams.
 NODE_STATUS = {
-    "router": "Understanding your question…",
-    "agent_node": "Planning the search…",
-    "retrieval": "Searching papers and the web…",
-    "relevancy_check": "Checking relevance of results…",
-    "query_rewrite": "Refining the search query…",
-    "verify_claim": "Verifying the claim against recent papers…",
-    "generate_answer": "Writing the answer…",
+    "router": "Understanding your question",
+    "agent_node": "Planning the search",
+    "retrieval": "Searching papers and the web",
+    "relevancy_check": "Checking the results",
+    "query_rewrite": "Refining the search",
+    "verify_claim": "Checking the claim against recent papers",
+    "generate_answer": "Writing the answer",
 }
 _rename_llm = FallbackLLM(fast=True)
 
@@ -100,10 +100,10 @@ EXAMPLE_PROMPTS = [
 PALETTES = {
     "light": {
         "bg": "#F6F8F7",
-        "surface": "rgba(255,255,255,0.82)",
+        "surface": "#FFFFFF",
         "surface-solid": "#FFFFFF",
         "surface-2": "rgba(15,23,42,0.045)",
-        "sidebar": "rgba(255,255,255,0.55)",
+        "sidebar": "#E7EFED",
         "border": "rgba(15,23,42,0.08)",
         "border-strong": "rgba(15,23,42,0.14)",
         "glass-edge": "rgba(255,255,255,0.75)",
@@ -126,10 +126,10 @@ PALETTES = {
     },
     "dark": {
         "bg": "#070B0A",
-        "surface": "rgba(255,255,255,0.045)",
+        "surface": "#141C1A",
         "surface-solid": "#111816",
         "surface-2": "rgba(255,255,255,0.06)",
-        "sidebar": "rgba(10,16,15,0.6)",
+        "sidebar": "#111A18",
         "border": "rgba(255,255,255,0.08)",
         "border-strong": "rgba(255,255,255,0.15)",
         "glass-edge": "rgba(255,255,255,0.10)",
@@ -174,7 +174,7 @@ def apply_streamlit_theme(mode: str) -> bool:
         "theme.secondaryBackgroundColor": "#EEF2F1" if mode == "light" else "#141C1A",
         "theme.textColor": p["text"],
         "theme.borderColor": "#E1E7E5" if mode == "light" else "#22302D",
-        "theme.sidebar.backgroundColor": "#F1F5F4" if mode == "light" else "#0A100F",
+        "theme.sidebar.backgroundColor": "#E7EFED" if mode == "light" else "#111A18",
     }
     changed = False
     for key, value in wanted.items():
@@ -198,30 +198,9 @@ html, body, .stApp, button, input, textarea, [data-testid="stMarkdownContainer"]
     font-family: 'Plus Jakarta Sans', 'Inter', sans-serif !important;
 }
 
-/* ── Animated mesh background ──────────────────────────────────────────── */
+/* ── Background: plain, solid ───────────────────────────────────────── */
 .stApp { background: var(--sl-bg); color: var(--sl-text); }
 [data-testid="stAppViewContainer"], [data-testid="stMain"], .main { background: transparent !important; }
-.stApp::before, .stApp::after {
-    content: ""; position: fixed; pointer-events: none; z-index: 0;
-    width: 60vmax; height: 60vmax; border-radius: 50%; filter: blur(70px);
-}
-.stApp::before {
-    top: -22vmax; left: -12vmax;
-    background: radial-gradient(circle, var(--sl-blob-1), transparent 65%);
-}
-.stApp::after {
-    bottom: -26vmax; right: -14vmax;
-    background: radial-gradient(circle, var(--sl-blob-2), transparent 65%);
-}
-[data-testid="stAppViewContainer"]::before {
-    content: ""; position: fixed; pointer-events: none; z-index: 0;
-    top: 20vh; right: 10vw; width: 38vmax; height: 38vmax; border-radius: 50%; filter: blur(80px);
-    background: radial-gradient(circle, var(--sl-blob-3), transparent 65%);
-}
-[data-testid="stAppViewContainer"] > *, [data-testid="stSidebar"] { position: relative; z-index: 1; }
-@keyframes sl-float-a { to { transform: translate(14vmax, 10vmax) scale(1.12); } }
-@keyframes sl-float-b { to { transform: translate(-12vmax, -8vmax) scale(1.08); } }
-@keyframes sl-float-c { to { transform: translate(-10vmax, 12vmax) scale(0.9); } }
 
 /* ── Streamlit chrome ──────────────────────────────────────────────────── */
 #MainMenu, footer, [data-testid="stDecoration"], [data-testid="stToolbarActions"] { display: none !important; }
@@ -236,34 +215,31 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 [data-testid="stSidebarCollapseButton"] button {
     border-radius: 12px !important;
     background: var(--sl-surface) !important; color: var(--sl-text) !important;
-    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
     border: 1px solid var(--sl-border) !important; box-shadow: var(--sl-shadow);
 }
 
-/* Glass helper (not on chat bubbles: blurring dozens of messages makes every update repaint slowly) */
-[data-testid="stChatInput"], [class*="st-key-example_"] button,
-.st-key-theme_toggle button, .sl-tip, .sl-doc {
-    backdrop-filter: blur(18px) saturate(160%);
-    -webkit-backdrop-filter: blur(18px) saturate(160%);
-}
 
 /* ── Theme toggle: fixed top-right ─────────────────────────────────────── */
 .st-key-theme_toggle {
     position: fixed !important; top: .65rem; right: 1rem; z-index: 1000000; width: auto !important;
 }
+/* icon-only round button, same size as the other two */
 .st-key-theme_toggle button {
-    border-radius: 999px !important; padding: .3rem .9rem !important; min-height: 0 !important;
+    position: relative !important;
+    width: 36px !important; height: 36px !important; min-height: 36px !important;
+    padding: 0 !important; border-radius: 50% !important;
     background: var(--sl-surface) !important; color: var(--sl-text) !important;
-    border: 1px solid var(--sl-glass-edge) !important; box-shadow: var(--sl-shadow-lg);
-    transition: transform .2s ease, box-shadow .2s ease;
+    border: 1px solid var(--sl-border-strong) !important; box-shadow: var(--sl-shadow);
 }
-.st-key-theme_toggle button:hover { transform: translateY(-1px); box-shadow: var(--sl-shadow-accent); }
-.st-key-theme_toggle button [data-testid="stIconMaterial"] { color: var(--sl-accent); transition: transform .5s ease; }
-.st-key-theme_toggle button:hover [data-testid="stIconMaterial"] { transform: rotate(-25deg); }
-.st-key-theme_toggle button p { font-size: .8rem; font-weight: 600; }
+.st-key-theme_toggle button [data-testid="stMarkdownContainer"], .st-key-theme_toggle button p { display: none !important; }
+.st-key-theme_toggle button [data-testid="stIconMaterial"] {
+    position: absolute !important; top: 50%; left: 50%; transform: translate(-50%, -50%) !important;
+    margin: 0 !important; font-size: 1.15rem !important; line-height: 1 !important; color: var(--sl-accent);
+}
+.st-key-theme_toggle button:hover { border-color: var(--sl-accent) !important; }
 
 /* ── Welcome ───────────────────────────────────────────────────────────── */
-.sl-welcome { text-align: center; margin: 2.8rem 0 2.2rem; animation: sl-rise .6s ease both; }
+.sl-welcome { text-align: center; margin: 2.8rem 0 2rem; }
 .sl-mark {
     width: 58px; height: 58px; border-radius: 18px; margin: 0 auto 1.3rem;
     display: grid; place-items: center; color: var(--sl-on-accent);
@@ -275,28 +251,21 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
     font-size: .75rem; font-weight: 600; color: var(--sl-accent-text);
     padding: .3rem .8rem; border-radius: 999px;
     background: var(--sl-surface); border: 1px solid var(--sl-glass-edge);
-    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
     box-shadow: var(--sl-shadow);
 }
 .sl-welcome h1 {
-    font-size: 2.6rem; font-weight: 800; letter-spacing: -0.04em; line-height: 1.1;
+    font-size: 2.2rem; font-weight: 700; letter-spacing: -0.025em; line-height: 1.15;
     color: var(--sl-text); margin: 0 0 .8rem; padding: 0;
 }
-.sl-grad-text {
-    background: var(--sl-grad-vivid); background-size: 250% 100%;
-    -webkit-background-clip: text; background-clip: text; color: transparent;
-    animation: sl-shimmer 6s linear infinite;
-}
+.sl-grad-text { color: var(--sl-accent-text); }
 @keyframes sl-shimmer { to { background-position: 250% 0; } }
 .sl-welcome p { color: var(--sl-muted); font-size: 1rem; margin: 0 auto; max-width: 540px; line-height: 1.6; }
 
-[class*="st-key-example_"] { animation: sl-rise .6s ease both; }
-.st-key-example_1 { animation-delay: .06s; } .st-key-example_2 { animation-delay: .12s; } .st-key-example_3 { animation-delay: .18s; }
 [class*="st-key-example_"] button {
     position: relative; overflow: hidden;
     width: 100%; min-height: 70px;
     justify-content: flex-start !important; text-align: left; gap: .7rem;
-    padding: .85rem 1rem !important; border-radius: 18px !important;
+    padding: .85rem 1rem !important; border-radius: 12px !important;
     background: var(--sl-surface) !important; color: var(--sl-text) !important;
     border: 1px solid var(--sl-glass-edge) !important; box-shadow: var(--sl-shadow-lg);
     transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
@@ -313,31 +282,49 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
     gap: .8rem !important; width: 100%;
 }
 [class*="st-key-example_"] button [data-testid="stIconMaterial"] {
-    color: var(--sl-accent-text); font-size: 1.15rem;
-    width: 34px; height: 34px; min-width: 34px; display: grid; place-items: center;
-    border-radius: 10px; background: var(--sl-accent-soft); margin: 0 !important;
+    color: var(--sl-muted); font-size: 1.15rem;
+    margin: 0 .75rem 0 0 !important;
 }
 
-/* Shine sweep on hover (cards + primary buttons) */
-[class*="st-key-example_"] button::after,
-.st-key-new_chat button::after, .st-key-btn_add_files button::after,
-.st-key-btn_load_urls button::after, .st-key-btn_load_arxiv button::after {
-    content: ""; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
-    background: linear-gradient(100deg, transparent, rgba(255,255,255,0.35), transparent);
-    transform: skewX(-20deg); pointer-events: none;
+
+/* ── Answer typography: headings sized for a chat bubble, readable code ── */
+[data-testid="stChatMessageContent"] h1 { font-size: 1.3rem !important; }
+[data-testid="stChatMessageContent"] h2 { font-size: 1.15rem !important; }
+[data-testid="stChatMessageContent"] h3 { font-size: 1.05rem !important; }
+[data-testid="stChatMessageContent"] h4, [data-testid="stChatMessageContent"] h5,
+[data-testid="stChatMessageContent"] h6 { font-size: .98rem !important; }
+[data-testid="stChatMessageContent"] h1, [data-testid="stChatMessageContent"] h2,
+[data-testid="stChatMessageContent"] h3, [data-testid="stChatMessageContent"] h4 {
+    font-weight: 700 !important; line-height: 1.35 !important; letter-spacing: -0.01em;
+    margin: 1rem 0 .4rem !important; padding: 0 !important;
 }
-[class*="st-key-example_"] button:hover::after,
-.st-key-new_chat button:hover::after, .st-key-btn_add_files button:hover::after,
-.st-key-btn_load_urls button:hover::after, .st-key-btn_load_arxiv button:hover::after {
-    animation: sl-shine .8s ease;
+[data-testid="stChatMessageContent"] pre, [data-testid="stChatMessageContent"] pre code { font-size: .86rem !important; }
+[data-testid="stChatMessageContent"] .token.comment { color: var(--sl-muted) !important; font-style: italic; }
+
+/* ── Inputs and plain buttons follow our palette (no light flash while the theme switches) ── */
+[data-testid="stTextInput"] [data-baseweb="base-input"], [data-testid="stTextInput"] input,
+[data-testid="stTextArea"] [data-baseweb="base-input"], [data-testid="stTextArea"] textarea {
+    background: var(--sl-surface-solid) !important; color: var(--sl-text) !important;
 }
-@keyframes sl-shine { to { left: 130%; } }
+[data-testid="stTextInput"] [data-baseweb="input"], [data-testid="stTextArea"] [data-baseweb="textarea"] {
+    background: var(--sl-surface-solid) !important; border-color: var(--sl-border-strong) !important;
+}
+[data-testid="stChatInput"] textarea { background: transparent !important; color: var(--sl-text) !important; }
+[data-testid="stBaseButton-secondary"] { background-color: var(--sl-surface-solid); color: var(--sl-text); border-color: var(--sl-border-strong); }
+
+/* ── Current chat title above the conversation (desktop) ── */
+.sl-chat-heading {
+    font-size: .95rem; font-weight: 600; color: var(--sl-muted);
+    padding-bottom: .6rem; margin-bottom: 1rem; border-bottom: 1px solid var(--sl-border);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(100% - 140px);
+}
+
+/* ── Open document in the sidebar list ── */
 
 /* ── Messages ──────────────────────────────────────────────────────────── */
 [data-testid="stChatMessage"] {
     background: transparent; border: none; box-shadow: none;
     padding: 0; margin-bottom: 1.3rem; gap: .75rem; align-items: flex-start;
-    animation: sl-rise .4s ease both;
 }
 @keyframes sl-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
 [data-testid="stChatMessage"] p, [data-testid="stChatMessage"] li { line-height: 1.72; font-size: .965rem; }
@@ -364,7 +351,7 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 [data-testid="stChatMessage"]:not(:has(.sl-user)) [data-testid="stChatMessageContent"] {
     background: var(--sl-surface-solid);
     border: 1px solid var(--sl-glass-edge);
-    border-radius: 6px 20px 20px 20px;
+    border-radius: 4px 14px 14px 14px;
     padding: 1rem 1.2rem 1.15rem;
     box-shadow: var(--sl-shadow-lg);
 }
@@ -381,7 +368,7 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 [data-testid="stChatMessage"]:has(.sl-user) [data-testid="stChatMessageContent"] {
     flex: 0 1 auto;
     background: var(--sl-grad);
-    border-radius: 20px 6px 20px 20px;
+    border-radius: 14px 4px 14px 14px;
     padding: .75rem 1.1rem;
     box-shadow: var(--sl-shadow-accent);
 }
@@ -422,7 +409,6 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 /* ── Chat input: glass with animated gradient ring on focus ─────────────── */
 [data-testid="stBottom"] > div {
     background: var(--sl-surface) !important;
-    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
     border-top: 1px solid var(--sl-border);
 }
 [data-testid="stBottomBlockContainer"] {
@@ -430,7 +416,7 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
     padding: .65rem 1rem .9rem !important;
 }
 [data-testid="stChatInput"] {
-    border-radius: 20px !important;
+    border-radius: 14px !important;
     background: var(--sl-surface-solid) !important;
     border: 1px solid var(--sl-border-strong) !important;
     box-shadow: var(--sl-shadow-lg);
@@ -456,17 +442,39 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 /* ── Sidebar (glass) ───────────────────────────────────────────────────── */
 [data-testid="stSidebar"] {
     background: var(--sl-sidebar) !important;
-    backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%);
-    border-right: 1px solid var(--sl-glass-edge);
+    border-right: 1px solid var(--sl-border-strong);
 }
 [data-testid="stSidebarContent"] { padding-top: 0; background: transparent; overflow-x: hidden !important; }
+/* the scrollbar ate into the right inset only; a thin bar plus a matching gutter on the left keeps both sides equal */
+[data-testid="stSidebarContent"] { scrollbar-width: thin; scrollbar-gutter: stable both-edges; }
 /* The sidebar header only holds the collapse button; pin it to the corner so the brand sits at the top */
+/* Collapse chevron: a zero-height sticky row at the top of the scroll area, so it never scrolls away */
 [data-testid="stSidebarHeader"] {
-    position: absolute; top: .9rem; right: .75rem; z-index: 5;
-    height: auto !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important;
+    position: sticky !important; top: 0; z-index: 30;
+    height: 0 !important; min-height: 0 !important; padding: 0 .9rem 0 0 !important; margin: 0 !important;
+    display: flex !important; justify-content: flex-end; align-items: flex-start; overflow: visible !important;
 }
-[data-testid="stSidebarUserContent"] { padding-top: 1rem !important; }
-.sl-brand { display: flex; align-items: center; gap: .7rem; margin: 0 2.6rem 1.1rem 0; }
+[data-testid="stSidebarCollapseButton"] { margin-top: 1rem !important; }
+/* the sticky header row below provides the top spacing, so it is pinned from the first pixel */
+[data-testid="stSidebarUserContent"] { padding-top: 0 !important; }
+.sl-brand { display: flex; align-items: center; gap: .7rem; margin: 0 2.6rem .9rem 0; }
+/* pinned sidebar header: logo + New chat */
+/* sticky has to sit on Streamlit's wrapper, otherwise it only sticks inside itself.
+   The wrapper is widened by the sidebar's 20px side inset so its background covers edge to edge. */
+[data-testid="stLayoutWrapper"]:has(> .st-key-side_top), .element-container:has(> .st-key-side_top) {
+    position: sticky !important; top: 0; z-index: 20;
+    background: var(--sl-sidebar);
+    padding: 1rem 0 .8rem;
+    /* full-bleed: paint the background sideways past the content inset, clip it vertically */
+    box-shadow: 0 0 0 100vmax var(--sl-sidebar);
+    clip-path: inset(0 -100vmax);
+}
+[data-testid="stLayoutWrapper"]:has(> .st-key-side_top)::after,
+.element-container:has(> .st-key-side_top)::after {
+    content: ""; position: absolute; left: -100vmax; right: -100vmax; bottom: 0; height: 1px;
+    background: var(--sl-muted); opacity: .3;
+}
+.st-key-side_top [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }
 .sl-logo {
     width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
     color: var(--sl-on-accent); background: var(--sl-grad); box-shadow: var(--sl-shadow-accent);
@@ -477,7 +485,7 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 .sl-brand-tag { font-size: .72rem; color: var(--sl-muted); margin-top: -1px; }
 .sl-side-title {
     display: flex; align-items: center; gap: .4rem;
-    font-size: .7rem; font-weight: 600; letter-spacing: .07em; text-transform: uppercase;
+    font-size: .8rem; font-weight: 600; letter-spacing: 0; text-transform: none;
     color: var(--sl-muted); margin: 1.3rem 0 .45rem;
 }
 [data-testid="stSidebar"] .stButton button {
@@ -493,8 +501,8 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 .st-key-btn_load_urls button > div, .st-key-btn_load_arxiv button > div { justify-content: center !important; }
 .st-key-chat_list { overflow-x: clip !important; }
 .sl-group {
-    font-size: .68rem; font-weight: 600; letter-spacing: .04em; color: var(--sl-muted);
-    margin: .55rem 0 .15rem .35rem;
+    font-size: .72rem; font-weight: 600; color: var(--sl-muted);
+    margin: .45rem 0 .1rem .45rem;
 }
 .st-key-chat_list .sl-group:first-child { margin-top: .1rem; }
 /* While answering, the send button turns into a Stop button (same spot, same size) */
@@ -518,36 +526,47 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 }
 .st-key-stop_gen button:hover { background: #B91C1C !important; transform: scale(1.05); }
 /* ── Chat cards in the sidebar ─────────────────────────────────────────── */
-[class*="st-key-chatrow_"] { position: relative; margin-bottom: .3rem; }
+[class*="st-key-chatrow_"] { position: relative; margin-bottom: 0; }
+/* tight list: Streamlit puts a 1rem gap between every element in a container */
+.st-key-chat_list, .st-key-chat_list > [data-testid="stVerticalBlock"],
+.st-key-doc_list, .st-key-doc_list > [data-testid="stVerticalBlock"] { gap: .1rem !important; }
+.st-key-chat_list [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }
 [class*="st-key-chatrow_"] [data-testid="stVerticalBlock"] { gap: 0 !important; }
 /* Streamlit gives markdown a -16px bottom margin; without this the row is shorter than the card,
    so the delete icon sat ~9px high and the card's bottom strip wasn't clickable. */
 [class*="st-key-chatrow_"] [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }
 .sl-chatcard {
     display: flex; align-items: center; gap: .65rem;
-    padding: .55rem 2.4rem .55rem .55rem; border-radius: 12px;
+    padding: .3rem 2.4rem .3rem .45rem; border-radius: 10px;
     border: 1px solid transparent; transition: background .15s ease, border-color .15s ease;
 }
-[class*="st-key-chatrow_idle_"]:hover .sl-chatcard {
-    background: var(--sl-surface-solid); border-color: var(--sl-border); box-shadow: var(--sl-shadow);
-}
+/* hover: no box; the name gets a smooth underline and the icon turns into a light circle */
+[class*="st-key-chatrow_idle_"]:hover .sl-chatcard { background: transparent; border-color: transparent; box-shadow: none; }
 .sl-chat-ico {
-    width: 32px; height: 32px; border-radius: 9px; flex-shrink: 0; display: grid; place-items: center;
-    color: var(--sl-muted); background: var(--sl-surface-2); transition: color .15s ease, background .15s ease;
+    width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0; display: grid; place-items: center;
+    color: var(--sl-muted); background: var(--sl-surface-2);
+    transition: color .2s ease, background .2s ease, border-radius .25s ease;
 }
-[class*="st-key-chatrow_idle_"]:hover .sl-chat-ico { color: var(--sl-accent); background: var(--sl-accent-soft); }
+[class*="st-key-chatrow_idle_"]:hover .sl-chat-ico { color: var(--sl-accent); background: var(--sl-accent-soft); border-radius: 50%; }
 .sl-chat-txt { min-width: 0; }
 .sl-chat-name {
     font-size: .86rem; font-weight: 550; color: var(--sl-text); line-height: 1.3;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.sl-chat-sub { font-size: .72rem; color: var(--sl-muted); margin-top: .1rem; }
-.sl-chatcard.is-active {
-    background: var(--sl-surface-solid); border-color: var(--sl-accent);
-    box-shadow: 0 0 0 3px var(--sl-accent-soft);
+/* underline that slides in from the left (a 2px background bar growing 0% → 100%) */
+.sl-chat-name span {
+    padding-bottom: 3px;
+    background-image: linear-gradient(var(--sl-accent), var(--sl-accent));
+    background-repeat: no-repeat; background-position: 0 100%; background-size: 0% 2px;
+    transition: background-size .35s cubic-bezier(.4, 0, .2, 1);
 }
-.sl-chatcard.is-active .sl-chat-ico { color: #FFFFFF; background: var(--sl-accent); }
-.sl-chatcard.is-active .sl-chat-name { font-weight: 700; }
+[class*="st-key-chatrow_idle_"]:hover .sl-chat-name span { background-size: 100% 2px; }
+.sl-chat-sub { font-size: .72rem; color: var(--sl-muted); margin-top: .1rem; }
+/* selected chat: no box; solid accent circle + full, solid underline under the name */
+.sl-chatcard.is-active { background: transparent; border-color: transparent; box-shadow: none; }
+.sl-chatcard.is-active .sl-chat-ico { color: #FFFFFF; background: var(--sl-accent); border-radius: 50%; }
+.sl-chatcard.is-active .sl-chat-name { font-weight: 700; color: var(--sl-accent-text); }
+.sl-chatcard.is-active .sl-chat-name span { background-size: 100% 2px; }
 .sl-chatcard.is-active .sl-chat-sub { color: var(--sl-accent-text); font-weight: 500; }
 /* invisible full-card click target */
 [class*="st-key-chatrow_"] [class*="st-key-open_"] {
@@ -584,7 +603,7 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 .element-container:has(> iframe[height="0"]) { display: none !important; }
 /* ── Tips: round icon button left of the theme toggle ─────────────────── */
 .st-key-tips_pop {
-    position: fixed !important; top: .65rem; right: calc(1rem + 98px); z-index: 1000000; width: auto !important;
+    position: fixed !important; top: .65rem; right: calc(1rem + 42px); z-index: 1000000; width: auto !important;
 }
 .st-key-tips_pop button {
     position: relative; width: 36px !important; height: 36px !important; min-height: 36px !important;
@@ -601,7 +620,7 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 }
 .st-key-tips_pop button:hover { transform: translateY(-1px) rotate(-8deg); }
 .st-key-details_on, .st-key-details_off {
-    position: fixed !important; top: .65rem; right: calc(1rem + 98px + 44px); z-index: 1000000; width: auto !important;
+    position: fixed !important; top: .65rem; right: calc(1rem + 84px); z-index: 1000000; width: auto !important;
 }
 .st-key-details_on button, .st-key-details_off button {
     position: relative; width: 36px !important; height: 36px !important; min-height: 36px !important;
@@ -839,7 +858,7 @@ body:has(.sl-overlay) [data-testid="stDialog"] {
 .sl-loader-hint { font-size: .78rem; line-height: 1.5; color: var(--sl-muted); }
 
 /* ── "Before you upload" modal ─────────────────────────────────────────── */
-div[role="dialog"] { border-radius: 20px !important; }
+div[role="dialog"] { border-radius: 14px !important; }
 .sl-modal-hero {
     display: flex; gap: .9rem; align-items: flex-start;
     padding: 1rem 1.1rem; border-radius: 16px;
@@ -859,9 +878,9 @@ div[role="dialog"] { border-radius: 20px !important; }
     color: var(--sl-text); background: var(--sl-surface-2); border: 1px solid var(--sl-border);
 }
 .sl-chip-ok { color: var(--sl-accent-text); background: var(--sl-accent-soft); border-color: transparent; }
-.sl-chip-no { color: #B91C1C; background: rgba(220,38,38,0.07); border-color: rgba(220,38,38,0.2); text-decoration: line-through; text-decoration-thickness: 1px; }
+.sl-chip-no { color: var(--sl-muted); background: transparent; border-style: dashed; }
 .sl-modal-section {
-    font-size: .72rem; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+    font-size: .84rem; font-weight: 600; letter-spacing: 0; text-transform: none;
     color: var(--sl-muted); margin: 1.1rem 0 .3rem;
 }
 [class*="st-key-sample_card_"] {
@@ -870,6 +889,9 @@ div[role="dialog"] { border-radius: 20px !important; }
     transition: border-color .15s ease;
 }
 [class*="st-key-sample_card_"]:hover { border-color: var(--sl-accent); }
+/* undo Streamlit's -16px markdown bottom margin inside our HTML cards */
+[class*="st-key-sample_card_"] [data-testid="stMarkdownContainer"],
+[class*="st-key-suggest_card_"] [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }
 .sl-sample-title { font-size: .88rem; font-weight: 600; color: var(--sl-text); line-height: 1.35; }
 .sl-sample-meta { font-size: .76rem; color: var(--sl-muted); margin-top: .15rem; }
 .sl-sample-meta a {
@@ -892,7 +914,7 @@ div[role="dialog"] { border-radius: 20px !important; }
 [class*="st-key-suggest_card_"] [data-testid="stColumn"] { min-width: 0 !important; }
 .sl-suggest-label {
     display: flex; align-items: center; gap: .3rem;
-    font-size: .68rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--sl-accent-text);
+    font-size: .76rem; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--sl-accent-text);
 }
 .sl-suggest-title {
     font-size: .84rem; font-weight: 600; color: var(--sl-text); line-height: 1.35; margin-top: .25rem; cursor: help;
@@ -910,8 +932,10 @@ div[role="dialog"] { border-radius: 20px !important; }
 [class*="st-key-suggest_add_"] button:hover { background: var(--sl-accent-hover) !important; }
 [class*="st-key-suggest_next_"] button {
     min-height: 32px !important; justify-content: center !important; border-radius: 10px !important;
-    background: var(--sl-surface-solid) !important; border: 1px solid var(--sl-border-strong) !important;
+    background: transparent !important; border: 1px solid var(--sl-accent) !important;
 }
+[class*="st-key-suggest_next_"] button [data-testid="stIconMaterial"] { color: var(--sl-accent-text) !important; }
+[class*="st-key-suggest_next_"] button:hover { background: var(--sl-accent-soft) !important; }
 .sl-or {
     text-align: center; font-size: .72rem; color: var(--sl-text); opacity: .72; margin: .45rem 0 .35rem;
     display: flex; align-items: center; gap: .5rem;
@@ -941,16 +965,6 @@ div[role="dialog"] { border-radius: 20px !important; }
 .sl-notice-compact .sl-notice-icon { width: 24px; height: 24px; border-radius: 7px; }
 .sl-notice-compact .sl-notice-title { font-size: .8rem; }
 .sl-notice-compact .sl-notice-text { font-size: .75rem; }
-[data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has([class*="st-key-trash_doc_"]) {
-    gap: .25rem !important; flex-wrap: nowrap !important;
-}
-[data-testid="stSidebar"] [data-testid="stHorizontalBlock"]:has([class*="st-key-trash_doc_"]) [data-testid="stColumn"] { min-width: 0 !important; }
-[class*="st-key-doc_"] button {
-    min-height: 34px !important; border-radius: 12px !important;
-    background: var(--sl-surface) !important; border: 1px solid var(--sl-glass-edge) !important;
-}
-[class*="st-key-doc_"] button:hover { border-color: var(--sl-accent) !important; }
-[class*="st-key-doc_"] button [data-testid="stIconMaterial"] { color: var(--sl-accent); }
 .st-key-viewer_head {
     position: sticky; top: 2.6rem; z-index: 40;
     padding: .7rem .9rem; margin-bottom: 1rem; border-radius: 16px;
@@ -963,7 +977,9 @@ div[role="dialog"] { border-radius: 20px !important; }
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .sl-viewer-title svg { color: var(--sl-accent); flex-shrink: 0; }
-.sl-viewer-meta { font-size: .78rem; color: var(--sl-muted); margin-top: .1rem; }
+.sl-viewer-meta { font-size: .78rem; color: var(--sl-muted); margin-top: .15rem; }
+/* undo Streamlit's -16px markdown bottom margin so the meta line isn't glued to the edge */
+.st-key-viewer_head [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }
 .st-key-viewer_download button, .st-key-close_viewer button {
     min-height: 38px !important; height: 38px; padding: 0 .9rem !important;
     border-radius: 10px !important; justify-content: center !important; white-space: nowrap;
@@ -1073,7 +1089,7 @@ body:has([data-baseweb="modal"]) .st-key-details_off { visibility: hidden; }
     }
     [data-testid="stSidebar"][aria-expanded="true"] > div { width: 100vw !important; }
     /* solid background: the glass sidebar let the chat show through on phones */
-    [data-testid="stSidebar"] { background: var(--sl-bg) !important; backdrop-filter: none !important; }
+    [data-testid="stSidebar"] { background: var(--sl-sidebar) !important; backdrop-filter: none !important; }
     [data-testid="stSidebarContent"] { scrollbar-width: none; }
     [data-testid="stSidebarContent"]::-webkit-scrollbar { width: 0; height: 0; }
     body:has([data-testid="stSidebar"][aria-expanded="true"]) .sl-mobile-header,
@@ -1081,7 +1097,7 @@ body:has([data-baseweb="modal"]) .st-key-details_off { visibility: hidden; }
     body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-tips_pop,
     body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-details_on,
     body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-details_off { display: none !important; }
-    [data-testid="stSidebarHeader"] { top: .75rem; right: .75rem; }
+
     .sl-brand { margin-right: 3rem; }
 
     /* Page spacing below the header */
@@ -1110,8 +1126,20 @@ body:has([data-baseweb="modal"]) .st-key-details_off { visibility: hidden; }
     [data-testid="stChatInput"] textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .st-key-stop_gen { right: calc(.7rem + 15px); bottom: calc(.7rem + 9px); }
 
-    /* Document viewer header stacks nicely */
+    /* Document viewer header: title on its own row, the two buttons side by side */
     .st-key-viewer_head { top: 60px; }
+    .st-key-viewer_head [data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; gap: .5rem !important; }
+    .st-key-viewer_head [data-testid="stColumn"] { min-width: 0 !important; }
+    .st-key-viewer_head [data-testid="stColumn"]:nth-child(1) { flex: 1 1 100% !important; width: 100% !important; }
+    .st-key-viewer_head [data-testid="stColumn"]:nth-child(2),
+    .st-key-viewer_head [data-testid="stColumn"]:nth-child(3) { flex: 1 1 calc(50% - .25rem) !important; width: calc(50% - .25rem) !important; }
+    .st-key-viewer_download button, .st-key-close_viewer button { height: 36px; min-height: 36px !important; }
+
+    /* long code lines wrap instead of scrolling sideways */
+    [data-testid="stChatMessageContent"] pre, [data-testid="stChatMessageContent"] pre code {
+        white-space: pre-wrap !important; word-break: break-word;
+    }
+    .sl-chat-heading { display: none; }
 }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -1429,13 +1457,11 @@ def md_text(text: str) -> str:
 MAX_PAPER_PAGES = 15
 MAX_UPLOAD_MB = 10  # keep in sync with server.maxUploadSize in .streamlit/config.toml
 
-SCOPE_NOTICE_TITLE = "Built for research papers only"
+SCOPE_NOTICE_TITLE = "Works best with research papers"
 SCOPE_NOTICE_TEXT = (
-    "ScholarLens is designed to read and reason over academic research papers. "
-    "Other documents (resumes, invoices, project reports, contracts, notes, etc.) "
-    "are not supported, and answers about them may be inaccurate or random. "
-    f"It currently runs on free-tier AI models, so papers of up to {MAX_PAPER_PAGES} pages "
-    "are supported for now."
+    f"Upload academic papers up to {MAX_PAPER_PAGES} pages and {MAX_UPLOAD_MB} MB. "
+    "Resumes, invoices, reports and other documents aren't supported and can get unreliable answers. "
+    "The app runs on free-tier models, so replies can sometimes be slow."
 )
 
 # Short papers (≤ 15 pages) users can try right away. (title, arXiv id, pages)
@@ -1611,8 +1637,8 @@ def _scope_body(session_id: str, first_visit: bool = False) -> None:
         <div class="sl-chips">
           <span class="sl-chip sl-chip-ok">{icon("file", 12)} Academic research papers</span>
           <span class="sl-chip">{icon("book", 12)} Up to {MAX_PAPER_PAGES} pages</span>
-          <span class="sl-chip sl-chip-free">{icon("sparkle", 12)} Free-tier AI models</span>
-          <span class="sl-chip sl-chip-no">{icon("alert", 12)} Resumes, invoices, reports</span>
+          <span class="sl-chip">{icon("bulb", 12)} Free-tier models</span>
+          <span class="sl-chip sl-chip-no">Not for resumes, invoices or reports</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -1687,9 +1713,9 @@ WEB_SAMPLES = [
 ]
 
 SUGGEST_TEXT = {
-    "file": ("Add this paper", "or upload your own · research papers only, max {pages} pages"),
-    "arxiv": ("Add this paper", "or search ArXiv · title or ID, max {pages} pages"),
-    "web": ("Add this page", "or paste your own links · research paper pages only"),
+    "file": ("Add this paper", "or upload your own"),
+    "arxiv": ("Add this paper", "or search arXiv"),
+    "web": ("Add this page", "or paste your own links"),
 }
 
 
@@ -1719,7 +1745,7 @@ def suggestion_card(tab: str) -> None:
 
     with st.container(key=f"suggest_card_{tab}"):
         st.markdown(
-            f'<div class="sl-suggest-label">{icon("sparkle", 12)} No paper handy? Try this one</div>'
+            f'<div class="sl-suggest-label">{icon("file", 12)} No paper handy? Try this one</div>'
             f'<div class="sl-suggest-title" title="{html.escape(help_text)}">{html.escape(title)}</div>'
             f'<div class="sl-suggest-meta">{html.escape(meta)} · '
             f'<a href="{link}" target="_blank" rel="noopener">{icon("download" if tab != "web" else "link", 11)} '
@@ -1972,24 +1998,26 @@ if "pending_load" not in st.session_state:
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown(
-        f"""
-        <div class="sl-brand">
-          <div class="sl-logo">{icon("book", 17)}</div>
-          <div>
-            <div class="sl-brand-name">ScholarLens</div>
-            <div class="sl-brand-tag">Research workspace</div>
-          </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    if st.button("New chat", key="new_chat", icon=":material/edit_square:", use_container_width=True):
-        new_sid = create_session()
-        st.session_state.active_session_id = new_sid
-        active_sid = new_sid
-        st.session_state._close_sidebar_mobile = True
-        st.rerun()
+    # Logo + "New chat" stay pinned at the top while the rest of the sidebar scrolls.
+    with st.container(key="side_top"):
+        st.markdown(
+            f"""
+            <div class="sl-brand">
+              <div class="sl-logo">{icon("book", 17)}</div>
+              <div>
+                <div class="sl-brand-name">ScholarLens</div>
+                <div class="sl-brand-tag">Research workspace</div>
+              </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        if st.button("New chat", key="new_chat", icon=":material/edit_square:", use_container_width=True):
+            new_sid = create_session()
+            st.session_state.active_session_id = new_sid
+            active_sid = new_sid
+            st.session_state._close_sidebar_mobile = True
+            st.rerun()
 
     sorted_sessions = sorted(
         st.session_state.sessions_meta.values(),
@@ -2049,12 +2077,12 @@ with st.sidebar:
                 st.markdown(
                     f'<div class="sl-chatcard{" is-active" if is_active else ""}">'
                     f'<div class="sl-chat-ico">{icon("chat", 15)}</div>'
-                    f'<div class="sl-chat-txt"><div class="sl-chat-name">{html.escape(session["name"])}</div>'
+                    f'<div class="sl-chat-txt"><div class="sl-chat-name"><span>{html.escape(session["name"])}</span></div>'
                     f'</div></div>',
                     unsafe_allow_html=True,
                 )
                 if st.button(session["name"], key=f"open_{sid}", use_container_width=True,
-                             help=None if is_active else "Open this chat") and not is_active:
+                             help=None) and not is_active:
                     with st.spinner("Opening chat…"):
                         switch_session(sid)
                     st.session_state._close_sidebar_mobile = True
@@ -2095,8 +2123,8 @@ with st.sidebar:
             help=f"Research papers only · max {MAX_UPLOAD_MB} MB and {MAX_PAPER_PAGES} pages per file",
         )
         st.markdown(
-            f'<div class="sl-upload-hint">PDF, TXT or Markdown · max {MAX_UPLOAD_MB} MB · '
-            f"up to {MAX_PAPER_PAGES} pages · uploads start automatically</div>",
+            f'<div class="sl-upload-hint">PDF, TXT or Markdown, up to {MAX_UPLOAD_MB} MB. '
+            "Uploading starts as soon as you pick a file.</div>",
             unsafe_allow_html=True,
         )
         if uploaded_files:
@@ -2142,7 +2170,7 @@ with st.sidebar:
             "Paper title or ArXiv ID",
             key=f"arxiv_input_{active_sid}",
             label_visibility="collapsed",
-            placeholder="1706.03762 or Attention Is All You Need",
+            placeholder="arXiv ID or paper title",
         )
         if st.button("Load paper", use_container_width=True, key="btn_load_arxiv"):
             if arxiv_title.strip():
@@ -2161,55 +2189,61 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
     if doc_titles is None:
-        st.caption("Could not load document list — try refreshing.")
+        st.caption("Could not load the document list. Try refreshing.")
     elif doc_titles:
         sources = load_sources(active_sid)
-        for i, t in enumerate(doc_titles):
-            src = sources.get(t, {})
-            doc_icon = (
-                ":material/language:" if src.get("kind") == "web"
-                else ":material/picture_as_pdf:" if str(src.get("path") or "").lower().endswith(".pdf")
-                else ":material/description:"
-            )
-            if st.session_state.get("pending_doc_delete") == t:
-                st.markdown(
-                    f'<div class="sl-confirm">Remove <b>{html.escape(t)}</b>? Its chunks and saved file '
-                    "will be deleted from this chat.</div>",
-                    unsafe_allow_html=True,
-                )
-                c_yes, c_no = st.columns(2)
-                if st.session_state.get("deleting_doc") == t:
-                    # Second run after the click: show the spinner inside the button, then remove.
-                    c_yes.button("Deleting…", key=f"del_busy_doc_{i}", disabled=True, use_container_width=True)
-                    c_no.button("Cancel", key=f"del_no_doc_{i}", disabled=True, use_container_width=True)
-                    try:
-                        remove_document(active_sid, t)
-                        st.toast(f"Removed {t}", icon=":material/delete:")
-                    except Exception as e:
-                        traceback.print_exc()
-                        st.session_state.setdefault("source_errors", []).append(
-                            f"Couldn't remove {t[:60]}: {friendly_error(e, 'source')}"
-                        )
-                    st.session_state.pending_doc_delete = None
-                    st.session_state.deleting_doc = None
-                    st.rerun()
-                if c_yes.button("Delete", key=f"del_yes_doc_{i}", icon=":material/delete:", use_container_width=True):
-                    st.session_state.deleting_doc = t
-                    st.rerun()
-                if c_no.button("Cancel", key=f"del_no_doc_{i}", use_container_width=True):
-                    st.session_state.pending_doc_delete = None
-                    st.rerun()
-                continue
-            c_doc, c_del = st.columns([6, 1], gap="small", vertical_alignment="center")
-            if c_doc.button(t, key=f"doc_{i}", icon=doc_icon, use_container_width=True, help="Open document"):
-                st.session_state.viewing_doc = {"session_id": active_sid, "title": t}
-                st.session_state._close_sidebar_mobile = True
-                st.rerun()
-            if c_del.button("", key=f"trash_doc_{i}", icon=":material/delete:", help="Remove document"):
-                st.session_state.pending_doc_delete = t
-                st.rerun()
+        with st.container(key="doc_list"):
+            for i, t in enumerate(doc_titles):
+                src = sources.get(t, {})
+                doc_icon = "globe" if src.get("kind") == "web" else "file"
+                if st.session_state.get("pending_doc_delete") == t:
+                    st.markdown(
+                        f'<div class="sl-confirm">Remove <b>{html.escape(t)}</b>? Its chunks and saved file '
+                        "will be deleted from this chat.</div>",
+                        unsafe_allow_html=True,
+                    )
+                    c_yes, c_no = st.columns(2)
+                    if st.session_state.get("deleting_doc") == t:
+                        # Second run after the click: show the spinner inside the button, then remove.
+                        c_yes.button("Deleting…", key=f"del_busy_doc_{i}", disabled=True, use_container_width=True)
+                        c_no.button("Cancel", key=f"del_no_doc_{i}", disabled=True, use_container_width=True)
+                        try:
+                            remove_document(active_sid, t)
+                            st.toast(f"Removed {t}", icon=":material/delete:")
+                        except Exception as e:
+                            traceback.print_exc()
+                            st.session_state.setdefault("source_errors", []).append(
+                                f"Couldn't remove {t[:60]}: {friendly_error(e, 'source')}"
+                            )
+                        st.session_state.pending_doc_delete = None
+                        st.session_state.deleting_doc = None
+                        st.rerun()
+                    if c_yes.button("Delete", key=f"del_yes_doc_{i}", icon=":material/delete:", use_container_width=True):
+                        st.session_state.deleting_doc = t
+                        st.rerun()
+                    if c_no.button("Cancel", key=f"del_no_doc_{i}", use_container_width=True):
+                        st.session_state.pending_doc_delete = None
+                        st.rerun()
+                    continue
+                is_open = (st.session_state.get("viewing_doc") or {}).get("title") == t
+                # Same card as a chat row: HTML card, invisible full-size button on top, trash on the right.
+                with st.container(key=f"chatrow_{'active' if is_open else 'idle'}_doc_{i}"):
+                    st.markdown(
+                        f'<div class="sl-chatcard{" is-active" if is_open else ""}">'
+                        f'<div class="sl-chat-ico">{icon(doc_icon, 15)}</div>'
+                        f'<div class="sl-chat-txt"><div class="sl-chat-name"><span>{html.escape(t)}</span></div>'
+                        f'</div></div>',
+                        unsafe_allow_html=True,
+                    )
+                    if st.button(t, key=f"open_doc_{i}", use_container_width=True, help=None) and not is_open:
+                        st.session_state.viewing_doc = {"session_id": active_sid, "title": t}
+                        st.session_state._close_sidebar_mobile = True
+                        st.rerun()
+                    if st.button("", key=f"trash_doc_{i}", icon=":material/delete:", help="Remove document"):
+                        st.session_state.pending_doc_delete = t
+                        st.rerun()
     else:
-        st.caption("No documents yet. Add files, web pages, or ArXiv papers above.")
+        st.caption("No documents yet. Add a file, web page or arXiv paper above.")
 
 
 if st.session_state.pop("_close_sidebar_mobile", False):
@@ -2224,16 +2258,16 @@ st.markdown(
 )
 
 # ── Tips (round ⚡ button next to the theme toggle) ─────────────────────────────
-with st.popover("Tips", key="tips_pop", help="Tips"):
+with st.popover("Tips", key="tips_pop"):
     st.markdown(
         f"""
         <div class="sl-tips">
-          <div class="sl-tips-title">{icon("sparkle", 14)} Quick tips</div>
+          <div class="sl-tips-title">{icon("bulb", 14)} Quick tips</div>
           <div class="sl-tips-row"><code>/btw</code><span>Start a message with <b>/btw</b> for a quick side question
           that isn't saved to the chat.</span></div>
           <div class="sl-tips-row"><code>■</code><span>Press the red <b>Stop</b> button in the input box to stop an answer.</span></div>
           <div class="sl-tips-row"><code>PDF</code><span>Click a document in the sidebar to read it right here.</span></div>
-          <div class="sl-tips-row"><code>15p</code><span>Research papers only, up to {MAX_PAPER_PAGES} pages and {MAX_UPLOAD_MB} MB.</span></div>
+          <div class="sl-tips-row"><code>Limit</code><span>Research papers only, up to {MAX_PAPER_PAGES} pages and {MAX_UPLOAD_MB} MB.</span></div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -2287,22 +2321,27 @@ if st.session_state.get("stop_gen") and partial and partial["session_id"] == act
     })
 
 # ── Chat input (read first so example buttons and typed messages share one path) ─
-typed_prompt = st.chat_input("Ask about your papers, verify a claim, or search the web…")
+typed_prompt = st.chat_input("Ask about your papers, check a claim, or search the web")
 prompt = typed_prompt or st.session_state.pop("pending_prompt", None)
 
 # ── Chat display ───────────────────────────────────────────────────────────────
 history = st.session_state.chats.get(active_sid, [])
 # Welcome screen lives in one slot: when a message is sent it is cleared right away
 # instead of lingering (Streamlit keeps the previous run's elements until a run ends).
+if history and not st.session_state.get("viewing_doc"):
+    _chat_title = st.session_state.sessions_meta.get(active_sid, {}).get("name", "")
+    if _chat_title:
+        st.markdown(f'<div class="sl-chat-heading">{html.escape(_chat_title)}</div>', unsafe_allow_html=True)
+
 welcome_slot = st.empty()
 if not history and not prompt:
     with welcome_slot.container():
         st.markdown(
             f"""
             <div class="sl-welcome">
-              <h1>What would you like to <span class="sl-grad-text">research</span> today?</h1>
-              <p>Ask questions about your papers, verify claims against recent literature,
-              or survey the latest work. Every answer is grounded in its sources.</p>
+              <h1>Ask your <span class="sl-grad-text">papers</span> anything</h1>
+              <p>Add a paper from the sidebar, then ask questions, check a claim,
+              or look for newer work. Answers show where they came from.</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -2387,7 +2426,7 @@ if prompt:
                 st.markdown("Please add a question after `/btw`, e.g. `/btw What is attention?`")
             else:
                 placeholder = st.empty()
-                placeholder.markdown("_Thinking…_")
+                placeholder.markdown("_Thinking_")
                 response_text = ""
                 try:
                     for chunk in handle_btw(query):
@@ -2398,7 +2437,7 @@ if prompt:
                     traceback.print_exc()
                     placeholder.markdown(md_text(f"⚠️ {friendly_error(e)}"))
                     show_error_details(e)
-            st.caption(":material/forum: Side question — not saved to this chat.")
+            st.caption(":material/forum: Side question, not saved to this chat.")
 
     else:
         if active_sid not in st.session_state.chats:
@@ -2438,7 +2477,7 @@ if prompt:
         config = {"configurable": {"thread_id": active_sid}}
 
         with st.container(key=f"live_a_{active_sid}_{len(history)}"), st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
-            status = st.status("Thinking…", expanded=False)
+            status = st.status("Thinking", expanded=False)
             fallback_before = fallback_calls()
             placeholder = st.empty()
             # Clicking any widget during a run makes Streamlit stop it and rerun; the
