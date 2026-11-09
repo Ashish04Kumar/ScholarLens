@@ -378,6 +378,10 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 [data-testid="stChatMessage"]:has(.sl-user) code { color: var(--sl-on-accent) !important; }
 [data-testid="stChatMessage"]:has(.sl-user) code { background: rgba(255,255,255,0.2); }
 .element-container:has(.sl-user), [data-testid="stElementContainer"]:has(.sl-user) { display: none; }
+/* While a new question runs, Streamlit reuses the previous run's block at the same spot, and its
+   leftover children (e.g. the last answer's "General knowledge" badge) stay faded inside the new
+   bubble until the run ends. Hide those leftovers in the live bubbles only, so history never flickers. */
+[class*="st-key-live_"] [data-testid="stElementContainer"][data-stale="true"] { display: none !important; }
 
 /* Thinking loader: shimmering label */
 [data-testid="stChatMessage"] [data-testid="stExpander"] details {
