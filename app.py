@@ -67,6 +67,7 @@ ICONS = {
     "search": '<circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/>',
     "globe": '<circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15 15 0 0 1 0 20a15 15 0 0 1 0-20z"/>',
     "download": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/>',
+    "menu": '<path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/>',
     "chat": '<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>',
     "alert": '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
     "sparkle": '<path d="M12 3l1.9 5.8L20 10.7l-6.1 1.9L12 18.5l-1.9-5.9L4 10.7l6.1-1.9z"/>',
@@ -1015,27 +1016,36 @@ body:has([data-baseweb="modal"]) .st-key-details_off { visibility: hidden; }
     }
     .sl-mh-brand { display: flex; align-items: center; gap: .5rem; font-weight: 700; font-size: 1rem; color: var(--sl-text); letter-spacing: -0.02em; }
     .sl-mh-logo { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--sl-accent); color: var(--sl-on-accent); }
-    .sl-mh-chev { color: var(--sl-muted); font-size: 1.2rem; font-weight: 500; margin-left: -.1rem; line-height: 1; }
+    .sl-mh-menu {
+        display: grid; place-items: center; width: 32px; height: 32px; margin-right: .1rem;
+        border-radius: 9px; color: var(--sl-text); border: 1px solid var(--sl-border-strong);
+    }
     /* The "open sidebar" button sits invisibly over the logo + name: tap the logo to open the menu */
     [data-testid="stExpandSidebarButton"] {
         position: fixed !important; top: 7px; left: .5rem; z-index: 999990;
-        width: 160px !important; height: 40px !important;
+        width: 190px !important; height: 40px !important;
         opacity: 0 !important; box-shadow: none !important; border: none !important;
     }
 
     /* Three round 34px buttons, flush right, 6px apart */
     .st-key-theme_toggle, .st-key-tips_pop, .st-key-details_on, .st-key-details_off { top: 11px !important; z-index: 999990; }
     .st-key-theme_toggle { right: .75rem !important; }
-    .st-key-tips_pop { right: calc(.75rem + 34px) !important; }
-    .st-key-details_on, .st-key-details_off { right: calc(.75rem + 68px) !important; }
+    .st-key-tips_pop { right: calc(.75rem + 38px) !important; }
+    .st-key-details_on, .st-key-details_off { right: calc(.75rem + 76px) !important; }
     .st-key-theme_toggle button, .st-key-tips_pop button, .st-key-details_on button, .st-key-details_off button {
         width: 32px !important; height: 32px !important; min-height: 32px !important;
         padding: 0 !important; border-radius: 50% !important; box-shadow: none !important;
         justify-content: center !important;
         border: 1px solid var(--sl-border-strong) !important;
     }
+    /* icon-only theme button: hide the label and pin the icon to the exact centre */
+    .st-key-theme_toggle button { position: relative !important; }
+    .st-key-theme_toggle button [data-testid="stMarkdownContainer"],
     .st-key-theme_toggle button p { display: none !important; }
-    .st-key-theme_toggle button [data-testid="stIconMaterial"] { margin: 0 !important; font-size: 1.1rem !important; }
+    .st-key-theme_toggle button [data-testid="stIconMaterial"] {
+        position: absolute !important; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        margin: 0 !important; font-size: 1.1rem !important; line-height: 1 !important;
+    }
 
     /* Sidebar opens full screen and covers the header + its buttons */
     [data-testid="stSidebar"][aria-expanded="true"] {
@@ -2124,8 +2134,8 @@ if st.session_state.pop("_close_sidebar_mobile", False):
 # ── Mobile header bar (hidden on desktop; the 3 round buttons sit on it) ──────────
 st.markdown(
     f'<div class="sl-mobile-header"><div class="sl-mh-brand">'
-    f'<span class="sl-mh-logo">{icon("book", 14)}</span>ScholarLens'
-    f'<span class="sl-mh-chev">›</span></div></div>',
+    f'<span class="sl-mh-menu">{icon("menu", 18)}</span>'
+    f'<span class="sl-mh-logo">{icon("book", 14)}</span>ScholarLens</div></div>',
     unsafe_allow_html=True,
 )
 
