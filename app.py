@@ -695,6 +695,19 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 [class*="st-key-del_no_"] button:hover { background: var(--sl-surface-2) !important; }
 [class*="st-key-del_yes_"] button > div, [class*="st-key-del_no_"] button > div { justify-content: center !important; }
 [class*="st-key-del_yes_"] button p, [class*="st-key-del_no_"] button p { font-size: .84rem !important; font-weight: 600 !important; }
+/* "Deleting…" busy state: red button with a spinner inside */
+[class*="st-key-del_busy_"] button {
+    width: 100% !important; min-height: 34px !important; border-radius: 10px !important;
+    justify-content: center !important; gap: .45rem;
+    background: #DC2626 !important; border: none !important; opacity: 1 !important; cursor: progress !important;
+}
+[class*="st-key-del_busy_"] button p { color: #FFFFFF !important; font-weight: 600 !important; font-size: .84rem !important; }
+[class*="st-key-del_busy_"] button::before {
+    content: ""; width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0;
+    border: 2px solid rgba(255,255,255,0.35); border-top-color: #FFFFFF;
+    animation: sl-spin .7s linear infinite;
+}
+[class*="st-key-del_no_"] button:disabled { opacity: .5; }
 .sl-confirm {
     font-size: .8rem; color: var(--sl-text); line-height: 1.45;
     padding: .55rem .7rem; margin: .2rem 0 .4rem; border-radius: 10px;
@@ -1267,9 +1280,11 @@ def scroll_to_bottom() -> None:
         <script>
         const doc = window.parent.document;
         const scroll = () => {
+          // Streamlit 1.5x scrolls the page inside this <section>; the others are fallbacks.
           const targets = [
+            doc.querySelector('[data-testid="stAppScrollToBottomContainer"]'),
+            doc.querySelector('section.stMain'),
             doc.querySelector('[data-testid="stMain"]'),
-            doc.querySelector('[data-testid="stAppViewContainer"]'),
             doc.scrollingElement,
           ];
           for (const el of targets) { if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" }); }
@@ -1908,10 +1923,16 @@ with st.sidebar:
                     unsafe_allow_html=True,
                 )
                 c_yes, c_no = st.columns(2)
-                if c_yes.button("Delete", key=f"del_yes_{sid}", icon=":material/delete:", use_container_width=True):
-                    with st.spinner("Deleting chat…"):
-                        delete_session(sid)
+                if st.session_state.get("deleting_chat") == sid:
+                    # Second run after the click: show the spinner inside the button, then delete.
+                    c_yes.button("Deleting…", key=f"del_busy_{sid}", disabled=True, use_container_width=True)
+                    c_no.button("Cancel", key=f"del_no_{sid}", disabled=True, use_container_width=True)
+                    delete_session(sid)
                     st.session_state.pending_delete = None
+                    st.session_state.deleting_chat = None
+                    st.rerun()
+                if c_yes.button("Delete", key=f"del_yes_{sid}", icon=":material/delete:", use_container_width=True):
+                    st.session_state.deleting_chat = sid
                     st.rerun()
                 if c_no.button("Cancel", key=f"del_no_{sid}", use_container_width=True):
                     st.session_state.pending_delete = None
@@ -2051,14 +2072,20 @@ with st.sidebar:
                     unsafe_allow_html=True,
                 )
                 c_yes, c_no = st.columns(2)
-                if c_yes.button("Delete", key=f"del_yes_doc_{i}", icon=":material/delete:", use_container_width=True):
-                    with st.spinner("Removing document…"):
-                        try:
-                            remove_document(active_sid, t)
-                            st.toast(f"Removed {t}", icon=":material/delete:")
-                        except Exception as e:
-                            st.session_state.setdefault("source_errors", []).append(f"Could not remove {t[:60]} — {e}")
+                if st.session_state.get("deleting_doc") == t:
+                    # Second run after the click: show the spinner inside the button, then remove.
+                    c_yes.button("Deleting…", key=f"del_busy_doc_{i}", disabled=True, use_container_width=True)
+                    c_no.button("Cancel", key=f"del_no_doc_{i}", disabled=True, use_container_width=True)
+                    try:
+                        remove_document(active_sid, t)
+                        st.toast(f"Removed {t}", icon=":material/delete:")
+                    except Exception as e:
+                        st.session_state.setdefault("source_errors", []).append(f"Could not remove {t[:60]} — {e}")
                     st.session_state.pending_doc_delete = None
+                    st.session_state.deleting_doc = None
+                    st.rerun()
+                if c_yes.button("Delete", key=f"del_yes_doc_{i}", icon=":material/delete:", use_container_width=True):
+                    st.session_state.deleting_doc = t
                     st.rerun()
                 if c_no.button("Cancel", key=f"del_no_doc_{i}", use_container_width=True):
                     st.session_state.pending_doc_delete = None

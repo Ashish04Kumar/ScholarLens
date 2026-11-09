@@ -1,4 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="32" fill="#E2E8F0"/>
-  <text x="32" y="40" text-anchor="middle" font-family="Inter, Helvetica, Arial, sans-serif" font-size="20" font-weight="600" fill="#475569">You</text>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#CCFBF1"/>
+      <stop offset="1" stop-color="#99F6E4"/>
+    </linearGradient>
+    <clipPath id="round"><circle cx="32" cy="32" r="32"/></clipPath>
+  </defs>
+  <circle cx="32" cy="32" r="32" fill="url(#bg)"/>
+  <g clip-path="url(#round)" fill="#0F766E">
+    <circle cx="32" cy="25" r="10.5"/>
+    <path d="M11 60c1.8-12.5 10.6-19.5 21-19.5S51.2 47.5 53 60v6H11z"/>
+  </g>
 </svg>
