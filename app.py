@@ -1769,29 +1769,6 @@ def chat_group(created_at: str) -> str:
     return "Older"
 
 
-def chat_when(created_at: str) -> str:
-    """Short time label for a chat card: '10:17 PM', 'Yesterday', '08 Nov'."""
-    try:
-        dt = datetime.fromisoformat(created_at)
-    except ValueError:
-        return ""
-    days = (datetime.now().date() - dt.date()).days
-    if days <= 0:
-        return dt.strftime("%I:%M %p").lstrip("0")
-    if days == 1:
-        return "Yesterday"
-    if days < 7:
-        return dt.strftime("%A")
-    return dt.strftime("%d %b")
-
-
-def chat_started(created_at: str) -> str:
-    try:
-        return datetime.fromisoformat(created_at).strftime("%d %b %Y, %I:%M %p")
-    except ValueError:
-        return "earlier"
-
-
 def create_session() -> str:
     sid = str(uuid.uuid4())
     st.session_state.sessions_meta[sid] = {
@@ -2017,12 +1994,11 @@ with st.sidebar:
                     f'<div class="sl-chatcard{" is-active" if is_active else ""}">'
                     f'<div class="sl-chat-ico">{icon("chat", 15)}</div>'
                     f'<div class="sl-chat-txt"><div class="sl-chat-name">{html.escape(session["name"])}</div>'
-                    f'<div class="sl-chat-sub">{chat_when(session["created_at"])}'
-                    f'{" · open" if is_active else ""}</div></div></div>',
+                    f'</div></div>',
                     unsafe_allow_html=True,
                 )
                 if st.button(session["name"], key=f"open_{sid}", use_container_width=True,
-                             help=f"Started {chat_started(session['created_at'])}") and not is_active:
+                             help=None if is_active else "Open this chat") and not is_active:
                     with st.spinner("Opening chat…"):
                         switch_session(sid)
                     st.session_state._close_sidebar_mobile = True

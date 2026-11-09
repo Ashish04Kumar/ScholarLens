@@ -2,6 +2,9 @@ FROM python:3.12
 
 WORKDIR /app
 
+# Chat timestamps ("Today" / "Yesterday" groups) use the server clock; keep it on IST.
+ENV TZ=Asia/Kolkata
+
 # ── Layer 0: Tesseract OCR for scanned PDFs (English, Marathi, Hindi) ─────────
 RUN apt-get update \
     && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-mar tesseract-ocr-hin \
