@@ -520,6 +520,9 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 /* ── Chat cards in the sidebar ─────────────────────────────────────────── */
 [class*="st-key-chatrow_"] { position: relative; margin-bottom: .3rem; }
 [class*="st-key-chatrow_"] [data-testid="stVerticalBlock"] { gap: 0 !important; }
+/* Streamlit gives markdown a -16px bottom margin; without this the row is shorter than the card,
+   so the delete icon sat ~9px high and the card's bottom strip wasn't clickable. */
+[class*="st-key-chatrow_"] [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }
 .sl-chatcard {
     display: flex; align-items: center; gap: .65rem;
     padding: .55rem 2.4rem .55rem .55rem; border-radius: 12px;
@@ -554,12 +557,21 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
     width: 100% !important; height: 100% !important; min-height: 0 !important;
     opacity: 0 !important; cursor: pointer !important;
 }
+/* stretch every wrapper so the invisible button covers the whole card */
+[class*="st-key-chatrow_"] [class*="st-key-open_"] .stButton,
+[class*="st-key-chatrow_"] [class*="st-key-open_"] .stButton > div,
+[class*="st-key-chatrow_"] [class*="st-key-open_"] [data-testid="stTooltipHoverTarget"] {
+    width: 100% !important; height: 100% !important;
+}
 [class*="st-key-chatrow_active_"] [class*="st-key-open_"] button { cursor: default !important; }
 /* delete icon on the right, above the click target */
 [class*="st-key-chatrow_"] [class*="st-key-trash_"] {
-    position: absolute !important; right: .4rem; top: 50%; transform: translateY(-50%);
-    z-index: 2; width: auto !important; margin: 0 !important;
+    position: absolute !important; right: .4rem; top: 0 !important; bottom: 0 !important;
+    display: flex !important; align-items: center; z-index: 2;
+    width: auto !important; height: auto !important; margin: 0 !important; transform: none !important;
 }
+[class*="st-key-chatrow_"] [class*="st-key-trash_"] > div,
+[class*="st-key-chatrow_"] [class*="st-key-trash_"] .stButton { display: flex; align-items: center; margin: 0 !important; }
 [class*="st-key-chatrow_"] [class*="st-key-trash_"] button { opacity: 0; transition: opacity .15s ease; }
 [class*="st-key-chatrow_"]:hover [class*="st-key-trash_"] button,
 [class*="st-key-chatrow_active_"] [class*="st-key-trash_"] button { opacity: .6; }
@@ -772,6 +784,10 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 .st-key-scope_info button [data-testid="stIconMaterial"] { color: #D97706 !important; }
 
 /* ── Full-screen loader while a source is being added ──────────────────── */
+/* While the loader is up, hide the (full-screen on phones) sidebar so the loader is visible. */
+@media (max-width: 768px) {
+    body:has(.sl-overlay) [data-testid="stSidebar"] { display: none !important; }
+}
 /* While the loader is up, hide any open dialog (and its backdrop) so the loader is in front. */
 body:has(.sl-overlay) [data-baseweb="modal"],
 body:has(.sl-overlay) div[role="dialog"],
@@ -1040,10 +1056,15 @@ body:has([data-baseweb="modal"]) .st-key-details_off { visibility: hidden; }
     .st-key-theme_toggle button { position: relative !important; }
     .st-key-theme_toggle button [data-testid="stMarkdownContainer"],
     .st-key-theme_toggle button p { display: none !important; }
-    .st-key-theme_toggle button [data-testid="stIconMaterial"] {
-        position: absolute !important; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    .st-key-theme_toggle button [data-testid="stIconMaterial"],
+    .st-key-theme_toggle button:hover [data-testid="stIconMaterial"],
+    .st-key-theme_toggle button:active [data-testid="stIconMaterial"] {
+        position: absolute !important; top: 50%; left: 50%;
+        /* keep the centring when the desktop hover "rotate" kicks in on tap */
+        transform: translate(-50%, -50%) !important;
         margin: 0 !important; font-size: 1.1rem !important; line-height: 1 !important;
     }
+    .st-key-theme_toggle button:hover, .st-key-theme_toggle button:active { transform: none !important; }
 
     /* Sidebar opens full screen and covers the header + its buttons */
     [data-testid="stSidebar"][aria-expanded="true"] {
@@ -1535,6 +1556,9 @@ def process_pending_load() -> None:
         return
     st.session_state.pop("pending_load", None)
     kind, items, sid = pending["kind"], pending["items"], pending["session_id"]
+    # Close the full-screen sidebar on phones. The previous (arming) run asked too, but its
+    # script can be torn down by the immediate rerun; loading takes seconds, so this one runs.
+    close_sidebar_on_mobile()
     overlay = st.empty()
     loaders = {"file": _load_file_into, "url": _load_url_into, "arxiv": _load_arxiv_into}
     total = len(items)
