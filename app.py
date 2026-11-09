@@ -685,6 +685,25 @@ body[data-sl-trace="off"] [class*="st-key-tracebox_"] { display: none !important
 .sl-trace-call.err, .sl-trace-sum .err { color: #DC2626; }
 .sl-trace-sum .warn { color: #B45309; }
 .sl-trace-sum .ok { color: var(--sl-accent-text); }
+.sl-trace-chunks { margin-top: .35rem; }
+.sl-trace-chunks summary {
+    cursor: pointer; width: fit-content; font-size: .74rem; font-weight: 600; color: var(--sl-accent-text);
+    padding: .15rem .55rem; border-radius: 999px; border: 1px solid var(--sl-border-strong); background: var(--sl-surface);
+    list-style: none;
+}
+.sl-trace-chunks summary::-webkit-details-marker { display: none; }
+.sl-trace-chunks summary::before { content: "▸ "; }
+.sl-trace-chunks[open] summary::before { content: "▾ "; }
+.sl-chunk {
+    margin-top: .45rem; padding: .5rem .6rem; border-radius: 8px;
+    background: var(--sl-surface); border: 1px solid var(--sl-border);
+}
+.sl-chunk-h { display: flex; align-items: center; gap: .4rem; font-size: .72rem; font-weight: 700; color: var(--sl-muted); margin-bottom: .25rem; }
+.sl-chunk-h span {
+    width: 18px; height: 18px; border-radius: 5px; display: grid; place-items: center; flex-shrink: 0;
+    background: var(--sl-accent-soft); color: var(--sl-accent-text);
+}
+.sl-chunk-t { font-size: .76rem; line-height: 1.5; color: var(--sl-text); white-space: pre-wrap; word-break: break-word; max-height: 220px; overflow-y: auto; }
 .sl-trace-sum { margin-top: .4rem; padding-top: .45rem; border-top: 1px dashed var(--sl-border-strong); font-weight: 600; color: var(--sl-text); }
 [data-testid="stPopoverBody"]:has(.sl-tips) { width: 320px; max-width: 90vw; }
 .sl-tips-title { display: flex; align-items: center; gap: .4rem; font-weight: 700; font-size: .9rem; margin-bottom: .5rem; color: var(--sl-text); }
@@ -1917,11 +1936,20 @@ def trace_detail(node: str, update, ctx: dict) -> str:
         new = docs[ctx.get("docs", 0):]
         ctx["docs"] = len(docs)
         titles = []
+        chunks = []
         for d in new:
             md = getattr(d, "metadata", {}) or {}
             t = md.get("title") or md.get("url") or md.get("source")
             if t and t not in titles:
                 titles.append(str(t))
+            page = md.get("page")
+            chunks.append({
+                "title": str(t or "Source"),
+                "where": f"page {page + 1}" if isinstance(page, int) else (md.get("url") or ""),
+                "text": getattr(d, "page_content", "") or "",
+            })
+        # Picked up by the caller and saved on the step, for "View chunks".
+        ctx["last_chunks"] = chunks
         return f"{len(new)} chunk(s) from: " + ", ".join(titles[:4]) if new else (notes or "No results")
     if node == "relevancy_check":
         return "Relevant: go on to the answer" if u.get("is_relevant") else "Not relevant: rewrite the query and search again"
@@ -1957,11 +1985,26 @@ def render_trace_html(trace: dict, running: bool = False) -> str:
                     f'<div class="sl-trace-call err">{who} failed after {c["secs"]}s · '
                     f'{html.escape(c.get("error", ""))}</div>'
                 )
+        # Retrieved chunks in a native <details>: opens in the browser, no Streamlit rerun.
+        chunks_html = ""
+        if step.get("chunks"):
+            items = []
+            for n, c in enumerate(step["chunks"], start=1):
+                where = f' · {html.escape(c["where"])}' if c.get("where") else ""
+                items.append(
+                    f'<div class="sl-chunk"><div class="sl-chunk-h"><span>{n}</span>'
+                    f'{html.escape(c["title"])}{where}</div>'
+                    f'<div class="sl-chunk-t">{html.escape(c["text"])}</div></div>'
+                )
+            chunks_html = (
+                f'<details class="sl-trace-chunks"><summary>View {len(items)} chunk(s)</summary>'
+                f'{"".join(items)}</details>'
+            )
         rows.append(
             f'<div class="sl-trace-row"><span class="sl-trace-n">{i}</span>'
             f'<div class="sl-trace-body"><div class="sl-trace-head"><b>{TRACE_NODES.get(step["node"], step["node"])}</b>'
             f'<span>{step["secs"]}s</span></div>'
-            f'<div class="sl-trace-d">{html.escape(step.get("detail") or "")}</div>{calls_html}</div></div>'
+            f'<div class="sl-trace-d">{html.escape(step.get("detail") or "")}</div>{calls_html}{chunks_html}</div></div>'
         )
     if running:
         rows.append('<div class="sl-trace-row running"><span class="sl-trace-n">…</span>'
@@ -2779,6 +2822,7 @@ if prompt:
                                 "node": upd_node, "secs": round(now - last_event, 1),
                                 "detail": trace_detail(upd_node, upd, trace_ctx),
                                 "calls": [{k: v for k, v in c.items() if k != "_used"} for c in mine],
+                                "chunks": trace_ctx.pop("last_chunks", []),
                             })
                         last_event = now
                         if trace_slot:
