@@ -537,7 +537,7 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 [class*="st-key-chatrow_"] [data-testid="stMarkdownContainer"] { margin-bottom: 0 !important; }
 .sl-chatcard {
     display: flex; align-items: center; gap: .65rem;
-    padding: .3rem 2.4rem .3rem .45rem; border-radius: 10px;
+    padding: .3rem 3.2rem .3rem .45rem; border-radius: 10px;  /* right: room for the trash icon + a gap */
     border: 1px solid transparent; transition: background .15s ease, border-color .15s ease;
 }
 /* hover: no box; the name gets a smooth underline and the icon turns into a light circle */
@@ -714,6 +714,8 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
     color: var(--sl-muted) !important; opacity: .55; background: transparent !important;
 }
 [class*="st-key-trash_"] button:hover { opacity: 1; color: #DC2626 !important; background: rgba(220,38,38,0.08) !important; }
+/* Streamlit's inner label row is left-aligned and 30px wide, which pushed the icon off-centre */
+[class*="st-key-trash_"] button > div { width: 100%; justify-content: center !important; gap: 0 !important; margin: 0 !important; }
 [class*="st-key-del_yes_"] button, [class*="st-key-del_no_"] button {
     width: 100% !important; min-height: 34px !important; padding: .3rem .6rem !important;
     border-radius: 10px !important; justify-content: center !important;
