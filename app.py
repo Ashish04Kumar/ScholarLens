@@ -4,6 +4,8 @@ import random
 import re
 import shutil
 import tempfile
+import threading
+import time
 import traceback
 import uuid
 from datetime import datetime
@@ -11,6 +13,7 @@ from pathlib import Path
 
 import streamlit as st
 import streamlit.components.v1 as components
+from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.messages import AIMessageChunk, HumanMessage
 
 from backend.btw_handler import handle_btw
@@ -642,6 +645,48 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 .st-key-details_on button { background: var(--sl-accent) !important; border-color: var(--sl-accent) !important; }
 .st-key-details_on button::before { background: var(--sl-on-accent); }
 .st-key-details_on button:hover, .st-key-details_off button:hover { transform: translateY(-1px); }
+/* Trace: same round button, left of Details */
+.st-key-trace_on, .st-key-trace_off {
+    position: fixed !important; top: .65rem; right: calc(1rem + 126px); z-index: 1000000; width: auto !important;
+}
+.st-key-trace_on button, .st-key-trace_off button {
+    position: relative; width: 36px !important; height: 36px !important; min-height: 36px !important;
+    padding: 0 !important; border-radius: 50% !important;
+    background: var(--sl-surface) !important; border: 1px solid var(--sl-glass-edge) !important;
+    box-shadow: var(--sl-shadow-lg); transition: transform .2s ease, background .2s ease;
+}
+.st-key-trace_on button > *, .st-key-trace_off button > * { display: none !important; }
+.st-key-trace_on button::before, .st-key-trace_off button::before {
+    content: ""; position: absolute; inset: 0; margin: auto; width: 17px; height: 17px;
+    background: var(--sl-muted);
+    -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-4l-3 9L9 3l-3 9H2'/%3E%3C/svg%3E") center / contain no-repeat;
+    mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-4l-3 9L9 3l-3 9H2'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.st-key-trace_on button { background: var(--sl-accent) !important; border-color: var(--sl-accent) !important; }
+.st-key-trace_on button::before { background: var(--sl-on-accent); }
+.st-key-trace_on button:hover, .st-key-trace_off button:hover { transform: translateY(-1px); }
+.sl-trace {
+    margin: .2rem 0 .8rem; padding: .7rem .8rem; border-radius: 12px;
+    background: var(--sl-surface-2); border: 1px solid var(--sl-border); font-size: .8rem; line-height: 1.45;
+}
+.sl-trace-title { font-weight: 700; font-size: .78rem; color: var(--sl-muted); margin-bottom: .4rem; }
+.sl-trace-row { display: flex; gap: .55rem; padding: .35rem 0; border-top: 1px solid var(--sl-border); }
+.sl-trace-row:first-of-type { border-top: none; }
+.sl-trace-n {
+    flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center;
+    font-size: .68rem; font-weight: 700; color: var(--sl-on-accent); background: var(--sl-accent);
+}
+.sl-trace-row.running .sl-trace-n { background: var(--sl-muted); }
+.sl-trace-body { min-width: 0; flex: 1; }
+.sl-trace-head { display: flex; justify-content: space-between; gap: .5rem; color: var(--sl-text); }
+.sl-trace-head span { color: var(--sl-muted); font-variant-numeric: tabular-nums; }
+.sl-trace-d { color: var(--sl-text); opacity: .85; word-break: break-word; }
+.sl-trace-call { font-size: .74rem; margin-top: .15rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-word; }
+.sl-trace-call.ok { color: var(--sl-muted); }
+.sl-trace-call.err, .sl-trace-sum .err { color: #DC2626; }
+.sl-trace-sum .warn { color: #B45309; }
+.sl-trace-sum .ok { color: var(--sl-accent-text); }
+.sl-trace-sum { margin-top: .4rem; padding-top: .45rem; border-top: 1px dashed var(--sl-border-strong); font-weight: 600; color: var(--sl-text); }
 [data-testid="stPopoverBody"]:has(.sl-tips) { width: 320px; max-width: 90vw; }
 .sl-tips-title { display: flex; align-items: center; gap: .4rem; font-weight: 700; font-size: .9rem; margin-bottom: .5rem; color: var(--sl-text); }
 .sl-tips-title svg { color: #F59E0B; }
@@ -1035,7 +1080,9 @@ div[role="dialog"] { border-radius: 14px !important; }
 body:has([data-baseweb="modal"]) .st-key-theme_toggle,
 body:has([data-baseweb="modal"]) .st-key-tips_pop,
 body:has([data-baseweb="modal"]) .st-key-details_on,
-body:has([data-baseweb="modal"]) .st-key-details_off { visibility: hidden; }
+body:has([data-baseweb="modal"]) .st-key-details_off,
+body:has([data-baseweb="modal"]) .st-key-trace_on,
+body:has([data-baseweb="modal"]) .st-key-trace_off { visibility: hidden; }
 
 .sl-mobile-header { display: none; }
 
@@ -1064,11 +1111,14 @@ body:has([data-baseweb="modal"]) .st-key-details_off { visibility: hidden; }
     }
 
     /* Three round 34px buttons, flush right, 6px apart */
-    .st-key-theme_toggle, .st-key-tips_pop, .st-key-details_on, .st-key-details_off { top: 11px !important; z-index: 999990; }
+    .st-key-theme_toggle, .st-key-tips_pop, .st-key-details_on, .st-key-details_off,
+    .st-key-trace_on, .st-key-trace_off { top: 11px !important; z-index: 999990; }
+    .st-key-trace_on, .st-key-trace_off { right: calc(.75rem + 114px) !important; }
     .st-key-theme_toggle { right: .75rem !important; }
     .st-key-tips_pop { right: calc(.75rem + 38px) !important; }
     .st-key-details_on, .st-key-details_off { right: calc(.75rem + 76px) !important; }
-    .st-key-theme_toggle button, .st-key-tips_pop button, .st-key-details_on button, .st-key-details_off button {
+    .st-key-theme_toggle button, .st-key-tips_pop button, .st-key-details_on button, .st-key-details_off button,
+    .st-key-trace_on button, .st-key-trace_off button {
         width: 32px !important; height: 32px !important; min-height: 32px !important;
         padding: 0 !important; border-radius: 50% !important; box-shadow: none !important;
         justify-content: center !important;
@@ -1102,7 +1152,9 @@ body:has([data-baseweb="modal"]) .st-key-details_off { visibility: hidden; }
     body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-theme_toggle,
     body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-tips_pop,
     body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-details_on,
-    body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-details_off { display: none !important; }
+    body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-details_off,
+    body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-trace_on,
+    body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-trace_off { display: none !important; }
 
     .sl-brand { margin-right: 3rem; }
 
@@ -1772,6 +1824,174 @@ def suggestion_card(tab: str) -> None:
     st.markdown(f'<div class="sl-or">{divider.format(pages=MAX_PAPER_PAGES)}</div>', unsafe_allow_html=True)
 
 
+# ── Pipeline trace (round "Trace" button) ─────────────────────────────────────
+TRACE_NODES = {
+    "router": "Router", "agent_node": "Agent", "retrieval": "Search", "relevancy_check": "Relevancy check",
+    "query_rewrite": "Query rewrite", "verify_claim": "Claim check", "generate_answer": "Answer",
+    "summarize": "Chat memory",
+}
+ROUTE_TEXT = {
+    "retrieve": "search your papers / the web",
+    "verify_claim": "fact-check a claim against recent papers",
+    "direct_answer": "answer from general knowledge (no search)",
+}
+
+
+class TraceLLMCalls(BaseCallbackHandler):
+    """Records every chat-model call of a run: graph node, provider, model, tokens, time, errors.
+
+    Passed in the graph's config, so it sees the calls inside every node (and each retry /
+    fallback attempt, since those are separate model runs).
+    """
+
+    def __init__(self):
+        self.calls: list[dict] = []
+        self._open: dict = {}
+        self._lock = threading.Lock()
+
+    def on_chat_model_start(self, serialized, messages, *, run_id, metadata=None, **kwargs):
+        md = metadata or {}
+        params = kwargs.get("invocation_params") or {}
+        provider = str(md.get("ls_provider") or "")
+        provider = "Gemini" if "google" in provider else "Groq" if "groq" in provider else provider or "LLM"
+        with self._lock:
+            self._open[run_id] = {
+                "node": md.get("langgraph_node", "?"), "provider": provider,
+                "model": md.get("ls_model_name") or params.get("model") or params.get("model_name") or "?",
+                "start": time.time(),
+            }
+
+    def _close(self, run_id, **update) -> None:
+        with self._lock:
+            info = self._open.pop(run_id, None)
+            if info:
+                info["secs"] = round(time.time() - info.pop("start"), 1)
+                info.update(update)
+                self.calls.append(info)
+
+    def on_llm_end(self, response, *, run_id, **kwargs):
+        usage = {}
+        try:
+            usage = response.generations[0][0].message.usage_metadata or {}
+        except Exception:
+            pass
+        if not usage:
+            tu = (response.llm_output or {}).get("token_usage") or {}
+            usage = {"input_tokens": tu.get("prompt_tokens"), "output_tokens": tu.get("completion_tokens")}
+        self._close(run_id, ok=True, tokens_in=usage.get("input_tokens"), tokens_out=usage.get("output_tokens"))
+
+    def on_llm_error(self, error, *, run_id, **kwargs):
+        self._close(run_id, ok=False, error=f"{type(error).__name__}: {str(error)[:160]}")
+
+
+def _merge_update(update) -> dict:
+    """A node's update is a dict, or a list of dicts when a tool returns Commands."""
+    if isinstance(update, dict):
+        return update
+    merged: dict = {}
+    for part in update or []:
+        if isinstance(part, dict):
+            for k, v in part.items():
+                merged[k] = merged.get(k, []) + v if k == "messages" else v
+    return merged
+
+
+def trace_detail(node: str, update, ctx: dict) -> str:
+    """One readable line for what a node did, from its state update."""
+    u = _merge_update(update)
+    msgs = u.get("messages") or []
+    if node == "router":
+        r = u.get("route")
+        return f"Route: {r} ({ROUTE_TEXT.get(r, '')})"
+    if node == "agent_node":
+        m = msgs[-1] if msgs else None
+        calls = getattr(m, "tool_calls", None) or []
+        if calls:
+            return "; ".join(
+                f"Calls {c['name']}(" + ", ".join(f"{k}={v!r}" for k, v in (c.get("args") or {}).items()) + ")"
+                for c in calls
+            )
+        return getattr(m, "content", "") or "No search"
+    if node == "retrieval":
+        docs = u.get("retrieved_docs")
+        notes = " ".join(getattr(m, "content", "") for m in msgs)
+        if docs is None:
+            return notes or "No results"
+        new = docs[ctx.get("docs", 0):]
+        ctx["docs"] = len(docs)
+        titles = []
+        for d in new:
+            md = getattr(d, "metadata", {}) or {}
+            t = md.get("title") or md.get("url") or md.get("source")
+            if t and t not in titles:
+                titles.append(str(t))
+        return f"{len(new)} chunk(s) from: " + ", ".join(titles[:4]) if new else (notes or "No results")
+    if node == "relevancy_check":
+        return "Relevant: go on to the answer" if u.get("is_relevant") else "Not relevant: rewrite the query and search again"
+    if node == "query_rewrite":
+        ctx["docs"] = 0
+        return f'New query: "{u.get("query", "")}"'
+    if node == "verify_claim":
+        return str(u.get("claim_verdict") or "Checked")[:200]
+    if node == "generate_answer":
+        return f"Answer written ({len(u.get('answer') or '')} characters)"
+    if node == "summarize":
+        return "Older turns folded into the chat summary" if u.get("summary") else "Nothing to summarise yet"
+    return ""
+
+
+def _fmt_tokens(n) -> str:
+    return f"{n:,}" if isinstance(n, int) else "?"
+
+
+def render_trace_html(trace: dict, running: bool = False) -> str:
+    rows = []
+    for i, step in enumerate(trace.get("steps", []), start=1):
+        calls_html = ""
+        for c in step.get("calls", []):
+            who = f"{c['provider']} · {html.escape(str(c['model']))}"
+            if c.get("ok"):
+                calls_html += (
+                    f'<div class="sl-trace-call ok">{who} · {_fmt_tokens(c.get("tokens_in"))} in / '
+                    f'{_fmt_tokens(c.get("tokens_out"))} out · {c["secs"]}s</div>'
+                )
+            else:
+                calls_html += (
+                    f'<div class="sl-trace-call err">{who} failed after {c["secs"]}s · '
+                    f'{html.escape(c.get("error", ""))}</div>'
+                )
+        rows.append(
+            f'<div class="sl-trace-row"><span class="sl-trace-n">{i}</span>'
+            f'<div class="sl-trace-body"><div class="sl-trace-head"><b>{TRACE_NODES.get(step["node"], step["node"])}</b>'
+            f'<span>{step["secs"]}s</span></div>'
+            f'<div class="sl-trace-d">{html.escape(step.get("detail") or "")}</div>{calls_html}</div></div>'
+        )
+    if running:
+        rows.append('<div class="sl-trace-row running"><span class="sl-trace-n">…</span>'
+                    '<div class="sl-trace-body"><div class="sl-trace-d">Working…</div></div></div>')
+    calls = [c for s in trace.get("steps", []) for c in s.get("calls", [])]
+    ok = [c for c in calls if c.get("ok")]
+    failed = [c for c in calls if not c.get("ok")]
+    t_in = sum(c.get("tokens_in") or 0 for c in ok)
+    t_out = sum(c.get("tokens_out") or 0 for c in ok)
+    groq_failed = [c for c in failed if c["provider"] == "Groq"]
+    used_gemini = any(c["provider"] == "Gemini" for c in ok)
+    if not calls:
+        health = ""
+    elif groq_failed and used_gemini:
+        health = f'<span class="err">Groq failing ({len(groq_failed)} error(s)), answered by Gemini fallback</span>'
+    elif groq_failed:
+        health = f'<span class="warn">Groq had {len(groq_failed)} error(s), recovered on retry</span>'
+    else:
+        health = '<span class="ok">Groq working normally</span>'
+    total = trace.get("total_secs")
+    summary = (
+        f'<div class="sl-trace-sum">{len(ok)} LLM call(s) · {t_in:,} tokens in / {t_out:,} out'
+        f'{f" · {total}s total" if total else ""}<br>{health}</div>'
+    ) if calls or total else ""
+    return f'<div class="sl-trace"><div class="sl-trace-title">Pipeline trace</div>{"".join(rows)}{summary}</div>'
+
+
 def answer_meta(state: dict) -> dict:
     """Small summary of a finished turn for the badges under an answer."""
     docs = state.get("retrieved_docs") or []
@@ -2293,6 +2513,21 @@ if st.button(
     st.session_state.show_details = not details_on
     st.rerun()
 
+# ── Pipeline trace on/off (round button next to Details) ──────────────────────
+trace_on = st.session_state.get("show_trace", False)
+if st.button(
+    "Trace",
+    key="trace_on" if trace_on else "trace_off",
+    help=(
+        "Live trace is ON: each step (router, agent, search, checks), what it decided, "
+        "and the LLM calls with tokens and time. Click to turn off."
+        if trace_on
+        else "Show a live trace of each step and its LLM calls (tokens, time, errors)."
+    ),
+):
+    st.session_state.show_trace = not trace_on
+    st.rerun()
+
 # ── Theme toggle (pinned to the page's top-right corner via CSS) ──────────────
 is_dark = theme == "dark"
 if st.button(
@@ -2411,6 +2646,9 @@ for idx, msg in enumerate(history):
         if msg["role"] == "assistant":
             render_meta(msg.get("meta"))
             # Only rendered (and sent to the browser) when the developer toggle is on.
+            if st.session_state.get("show_trace") and msg.get("trace"):
+                with st.expander("Pipeline trace", expanded=False, icon=":material/route:"):
+                    st.markdown(render_trace_html(msg["trace"]), unsafe_allow_html=True)
             if st.session_state.get("show_details") and msg.get("graph_state"):
                 with st.expander("Details", expanded=False, icon=":material/data_object:"):
                     st.json(msg["graph_state"])
@@ -2485,6 +2723,9 @@ if prompt:
         with st.container(key=f"live_a_{active_sid}_{len(history)}"), st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
             status = st.status("Thinking", expanded=False)
             fallback_before = fallback_calls()
+            # Live trace sits between the status line and the answer.
+            show_trace = st.session_state.get("show_trace", False)
+            trace_slot = st.empty() if show_trace else None
             placeholder = st.empty()
             # Clicking any widget during a run makes Streamlit stop it and rerun; the
             # next run sees stop_gen=True and keeps whatever was written so far.
@@ -2496,11 +2737,38 @@ if prompt:
             response_text = ""
             current_node = None
             state_snapshot, meta = None, None
+            # Trace is always collected (cheap) and saved with the answer; shown live only when on.
+            tracer = TraceLLMCalls()
+            trace = {"steps": []}
+            trace_ctx: dict = {}
+            run_start = last_event = time.time()
+            if trace_slot:
+                trace_slot.markdown(render_trace_html(trace, running=True), unsafe_allow_html=True)
 
             # Without this, a failing API call leaves the question in the chat with
             # no answer, and Streamlit's error box vanishes on the next rerun.
             try:
-                for chunk, metadata in graph.stream(input_state, config, stream_mode="messages"):
+                run_config = {**config, "callbacks": [tracer]}
+                for mode, payload in graph.stream(input_state, run_config, stream_mode=["messages", "updates"]):
+                    if mode == "updates":
+                        now = time.time()
+                        for upd_node, upd in (payload or {}).items():
+                            if upd_node.startswith("__"):
+                                continue
+                            with tracer._lock:
+                                mine = [c for c in tracer.calls if c["node"] == upd_node and not c.get("_used")]
+                                for c in mine:
+                                    c["_used"] = True
+                            trace["steps"].append({
+                                "node": upd_node, "secs": round(now - last_event, 1),
+                                "detail": trace_detail(upd_node, upd, trace_ctx),
+                                "calls": [{k: v for k, v in c.items() if k != "_used"} for c in mine],
+                            })
+                        last_event = now
+                        if trace_slot:
+                            trace_slot.markdown(render_trace_html(trace, running=True), unsafe_allow_html=True)
+                        continue
+                    chunk, metadata = payload
                     node = metadata.get("langgraph_node")
                     if node != current_node and node in NODE_STATUS and not response_text:
                         current_node = node
@@ -2521,6 +2789,9 @@ if prompt:
                 status.update(label="Done", state="complete")
                 stop_slot.empty()
                 st.session_state.pop("_partial", None)
+                trace["total_secs"] = round(time.time() - run_start, 1)
+                if trace_slot:
+                    trace_slot.markdown(render_trace_html(trace), unsafe_allow_html=True)
 
                 if not response_text:
                     final_values = graph.get_state(config).values
@@ -2545,6 +2816,15 @@ if prompt:
                 response_text = f"⚠️ {friendly_error(e)}"
                 placeholder.markdown(md_text(response_text))
                 show_error_details(e)
+                # Calls that errored before any node finished (e.g. Groq and Gemini both down).
+                with tracer._lock:
+                    left = [c for c in tracer.calls if not c.get("_used")]
+                if left:
+                    trace["steps"].append({"node": left[0]["node"], "secs": round(time.time() - last_event, 1),
+                                           "detail": "Failed", "calls": left})
+                trace["total_secs"] = round(time.time() - run_start, 1)
+                if trace_slot:
+                    trace_slot.markdown(render_trace_html(trace), unsafe_allow_html=True)
 
         st.session_state.chats[active_sid].append(
             {
@@ -2552,6 +2832,7 @@ if prompt:
                 "content": response_text,
                 "graph_state": state_snapshot,
                 "meta": meta,
+                "trace": trace,
                 "turn": current_turn,
             }
         )
