@@ -1,6 +1,7 @@
 import html
 import json
 import random
+import re
 import shutil
 import tempfile
 import traceback
@@ -1368,9 +1369,40 @@ def show_error_details(e: Exception) -> None:
         st.code(f"{type(e).__name__}: {str(e)[:1500]}", language=None)
 
 
+_CODE_RE = re.compile(r"(```.*?```|`[^`\n]+`)", re.DOTALL)
+_DISPLAY_MATH_RE = re.compile(r"\\\[(.+?)\\\]|\$\$(.+?)\$\$", re.DOTALL)
+_INLINE_PAREN_MATH_RE = re.compile(r"\\\((.+?)\\\)", re.DOTALL)
+_INLINE_DOLLAR_RE = re.compile(r"(?<!\\)\$([^$\n]+?)\$")
+
+
+def _render_math_segment(text: str) -> str:
+    """Prose (no code): make LaTeX render in Streamlit, keep prices like "$5" literal."""
+    keep: list[str] = []
+
+    def stash(math: str) -> str:
+        keep.append(math)
+        return f"\x00{len(keep) - 1}\x00"
+
+    # \[ … \] and $$ … $$ → display math on its own lines
+    text = _DISPLAY_MATH_RE.sub(lambda m: stash(f"\n\n$${(m.group(1) or m.group(2)).strip()}$$\n\n"), text)
+    # \( … \) → inline math
+    text = _INLINE_PAREN_MATH_RE.sub(lambda m: stash(f"${m.group(1).strip()}$"), text)
+    # $ … $ only counts as math if it looks like LaTeX (\, ^, _ or {); "$5 … $24" stays text
+    text = _INLINE_DOLLAR_RE.sub(
+        lambda m: stash(f"${m.group(1).strip()}$") if re.search(r"[\\^_{]", m.group(1)) else m.group(0), text
+    )
+    text = text.replace("$", r"\$")  # any remaining $ is a literal (prices)
+    return re.sub(r"\x00(\d+)\x00", lambda m: keep[int(m.group(1))], text)
+
+
 def md_text(text: str) -> str:
-    """Escape "$" so prices like "$5 … $24" aren't rendered as LaTeX math by Streamlit."""
-    return text.replace("$", r"\$")
+    r"""Prepare model output for st.markdown.
+
+    Models write math as \( … \) / \[ … \], which Streamlit doesn't render, and plain "$"
+    for prices, which Streamlit would wrongly treat as math. Code spans are left untouched.
+    """
+    parts = _CODE_RE.split(text)
+    return "".join(p if i % 2 else _render_math_segment(p) for i, p in enumerate(parts))
 
 
 MAX_PAPER_PAGES = 15
