@@ -9,7 +9,9 @@ from functools import lru_cache
 from pathlib import Path
 
 import pymupdf
-from langchain_community.document_loaders import PyMuPDFLoader, TextLoader, WebBaseLoader
+import requests
+from bs4 import BeautifulSoup
+from langchain_community.document_loaders import PyMuPDFLoader, TextLoader
 from langchain_core.documents import Document
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
@@ -52,6 +54,27 @@ def _ocr_language() -> str | None:
     return "+".join(installed) or None
 
 
+def pdf_limit_error(data: bytes, name: str, max_pages: int, max_mb: int) -> str | None:
+    """Readable reason a PDF is over the limits (or unreadable), else None.
+
+    Only opens the file to count pages (no text extraction or OCR), so it is instant
+    and runs before anything is sent to the embedding API.
+    """
+    size_mb = len(data) / 1024 / 1024
+    if size_mb > max_mb:
+        return f"{name} is {size_mb:.1f} MB. Files must be {max_mb} MB or smaller."
+    try:
+        with pymupdf.open(stream=data, filetype="pdf") as pdf:
+            if pdf.needs_pass:
+                return f"{name} is password protected. Remove the password and upload it again."
+            pages = pdf.page_count
+    except Exception:
+        return f"{name} isn't a readable PDF."
+    if pages > max_pages:
+        return f"{name} has {pages} pages. Research papers up to {max_pages} pages only."
+    return None
+
+
 def _read_pdf(file_path: str) -> list[Document]:
     """Load PDF pages, OCR-ing any page that has no extractable text."""
     docs = PyMuPDFLoader(file_path).load()
@@ -81,9 +104,66 @@ def load_markdown(file_path: str) -> list[Document]:
     return _stamp_title(_md_splitter.split_documents(docs), Path(file_path).stem)
 
 
-def load_webpage(url: str) -> list[Document]:
-    docs = WebBaseLoader(url, requests_kwargs={"timeout": 30}).load()
-    title = (docs[0].metadata.get("title") or url) if docs else url
+# A web page has no pages, so its length is compared in characters: about one page of a research paper.
+WEB_CHARS_PER_PAGE = 4000
+WEB_PDF_CACHE = Path(tempfile.gettempdir()) / "scholarlens_web"
+
+
+def _download_capped(url: str, max_bytes: int | None) -> tuple[bytes, str]:
+    """GET a URL, giving up as soon as it is bigger than max_bytes (never downloads a huge file)."""
+    too_big = f"This link is larger than {max_bytes // (1024 * 1024)} MB." if max_bytes else ""
+    headers = {"User-Agent": f"Mozilla/5.0 (compatible; {_HTTP_HEADERS['User-Agent']})"}
+    with requests.get(url, headers=headers, timeout=30, stream=True) as resp:
+        resp.raise_for_status()
+        length = resp.headers.get("Content-Length", "")
+        if max_bytes and length.isdigit() and int(length) > max_bytes:
+            raise ValueError(too_big)
+        buf = bytearray()
+        for chunk in resp.iter_content(64 * 1024):
+            buf.extend(chunk)
+            if max_bytes and len(buf) > max_bytes:
+                raise ValueError(too_big)
+        return bytes(buf), resp.headers.get("Content-Type", "").lower()
+
+
+def load_webpage(url: str, max_pages: int | None = None, max_mb: int | None = None) -> list[Document]:
+    """Load a web page, or a PDF behind a link, applying the same limits as uploads when given."""
+    data, ctype = _download_capped(url, max_mb * 1024 * 1024 if max_mb else None)
+
+    if "application/pdf" in ctype or data[:5] == b"%PDF-":
+        name = Path(urllib.parse.urlparse(url).path).name or "document.pdf"
+        if max_pages and max_mb:
+            problem = pdf_limit_error(data, name, max_pages, max_mb)
+            if problem:
+                raise ValueError(problem)
+        WEB_PDF_CACHE.mkdir(parents=True, exist_ok=True)
+        pdf_path = WEB_PDF_CACHE / f"{abs(hash(url))}.pdf"
+        pdf_path.write_bytes(data)
+        docs = _read_pdf(str(pdf_path))
+        if not docs:
+            raise ValueError(f"{name} has no readable pages.")
+        # "1512.03385" has no .pdf suffix; Path.stem would cut it to "1512".
+        title = (docs[0].metadata.get("title") or "").strip() or re.sub(r"\.pdf$", "", name, flags=re.I)
+        chunks = _stamp_title(_splitter.split_documents(docs), title)
+        for chunk in chunks:
+            chunk.metadata["pdf_url"] = url
+            chunk.metadata["pdf_cache_path"] = str(pdf_path)
+        return chunks
+
+    if ctype and not any(t in ctype for t in ("html", "xml", "text/plain")):
+        raise ValueError("This link isn't a web page or a PDF.")
+    soup = BeautifulSoup(data, "html.parser")
+    text = soup.get_text()
+    if not text.strip():
+        raise ValueError("No readable text found on this page.")
+    if max_pages and len(text) > max_pages * WEB_CHARS_PER_PAGE:
+        approx = round(len(text) / WEB_CHARS_PER_PAGE)
+        raise ValueError(
+            f"This page is too long: about {approx} pages of text. "
+            f"Web pages up to about {max_pages} pages only."
+        )
+    title = (soup.title.string.strip() if soup.title and soup.title.string else "") or url
+    docs = [Document(page_content=text, metadata={"source": url, "title": title})]
     return _stamp_title(_splitter.split_documents(docs), title)
 
 
@@ -153,10 +233,15 @@ def _arxiv_search(query: str) -> str:
     return re.sub(r"v\d+$", "", m.group(1))
 
 
-def _load_arxiv_by_id(arxiv_id: str) -> list[Document]:
+def _load_arxiv_by_id(arxiv_id: str, max_pages: int | None = None, max_mb: int | None = None) -> list[Document]:
     """Download and chunk an ArXiv paper PDF by its bare ID."""
     pdf_url = f"https://arxiv.org/pdf/{arxiv_id}"
     pdf_path = arxiv_pdf_path(arxiv_id)
+    if max_pages and max_mb:
+        # The page count is only known after the download; stop before reading/embedding it.
+        problem = pdf_limit_error(pdf_path.read_bytes(), f"arXiv {arxiv_id}", max_pages, max_mb)
+        if problem:
+            raise ValueError(problem)
     docs = _read_pdf(str(pdf_path))
     if not docs:
         raise ValueError(f"Could not load PDF for ArXiv ID: {arxiv_id}")
@@ -168,9 +253,9 @@ def _load_arxiv_by_id(arxiv_id: str) -> list[Document]:
     return chunks
 
 
-def load_arxiv(query: str) -> list[Document]:
+def load_arxiv(query: str, max_pages: int | None = None, max_mb: int | None = None) -> list[Document]:
     arxiv_id = _extract_arxiv_id(query) or _arxiv_search(query)
-    return _load_arxiv_by_id(arxiv_id)
+    return _load_arxiv_by_id(arxiv_id, max_pages, max_mb)
 
 
 def load_document(source: str) -> list[Document]:
