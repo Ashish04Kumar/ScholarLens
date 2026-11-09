@@ -2514,7 +2514,7 @@ if st.button(
     st.rerun()
 
 # ── Pipeline trace on/off (round button next to Details) ──────────────────────
-trace_on = st.session_state.get("show_trace", False)
+trace_on = st.session_state.get("show_trace", True)
 if st.button(
     "Trace",
     key="trace_on" if trace_on else "trace_off",
@@ -2646,7 +2646,7 @@ for idx, msg in enumerate(history):
         if msg["role"] == "assistant":
             render_meta(msg.get("meta"))
             # Only rendered (and sent to the browser) when the developer toggle is on.
-            if st.session_state.get("show_trace") and msg.get("trace"):
+            if st.session_state.get("show_trace", True) and msg.get("trace"):
                 with st.expander("Pipeline trace", expanded=False, icon=":material/route:"):
                     st.markdown(render_trace_html(msg["trace"]), unsafe_allow_html=True)
             if st.session_state.get("show_details") and msg.get("graph_state"):
@@ -2724,7 +2724,7 @@ if prompt:
             status = st.status("Thinking", expanded=False)
             fallback_before = fallback_calls()
             # Live trace sits between the status line and the answer.
-            show_trace = st.session_state.get("show_trace", False)
+            show_trace = st.session_state.get("show_trace", True)
             trace_slot = st.empty() if show_trace else None
             placeholder = st.empty()
             # Clicking any widget during a run makes Streamlit stop it and rerun; the
