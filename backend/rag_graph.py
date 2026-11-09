@@ -24,6 +24,8 @@ from backend.vector_store import search as vs_search
 load_dotenv()
 
 llm = FallbackLLM()
+# Low reasoning effort: folding old turns into the chat summary is a small job.
+summary_llm = FallbackLLM(fast=True)
 
 
 # ── State ─────────────────────────────────────────────────────────────────────
@@ -40,6 +42,9 @@ class RAGState(MessagesState):
     answer: str | None
     is_relevant: bool | None
     rewrite_count: int
+    # Rolling memory: older turns folded into a short summary, recent turns kept as they are.
+    summary: str
+    summarized_count: int
 
 
 # ── Router ────────────────────────────────────────────────────────────────────
@@ -205,6 +210,87 @@ def _drop_orphan_tool_calls(messages: list) -> list:
     ]
 
 
+# ── Chat memory (rolling summary + sliding window) ────────────────────────────
+# The latest RECENT_MESSAGES questions/answers are sent as they are (shortened); anything older
+# is folded into one running summary. Folding happens in batches of SUMMARY_BATCH so it costs
+# one small LLM call every couple of turns, not every turn.
+RECENT_MESSAGES = 8          # 4 question + answer pairs
+RECENT_CHARS = 800           # per message, so one long answer can't blow up the prompt
+SUMMARY_BATCH = 4            # fold 2 pairs at a time
+
+SUMMARY_SYSTEM = (
+    "You maintain a short running summary of a conversation between a user and a research "
+    "assistant about research papers. Merge the new exchanges into the existing summary. "
+    "Keep the topics, papers, key facts, numbers and conclusions the user may refer back to; "
+    "drop greetings and filler. Plain text, at most 180 words. Return only the summary."
+)
+
+
+def _conversation(messages: list) -> list:
+    """Only the user's real questions and the final answers (no tool calls, results or rewrites)."""
+    return [
+        m for m in messages
+        if (isinstance(m, HumanMessage) and m.name != "query_rewrite")
+        or (isinstance(m, AIMessage) and m.name == "answer")
+    ]
+
+
+def _memory_block(state: RAGState) -> str:
+    """Summary of older turns + the recent turns as text, for prompts. Excludes the current question."""
+    msgs = state["messages"]
+    last_h = max((i for i, m in enumerate(msgs) if isinstance(m, HumanMessage) and m.name != "query_rewrite"),
+                 default=len(msgs))
+    # Everything not yet folded into the summary (the window plus up to one pending batch),
+    # so no turn falls in the gap between the summary and the window.
+    recent = _conversation(msgs[:last_h])[state.get("summarized_count", 0) or 0:]
+    parts = []
+    if state.get("summary"):
+        parts.append(f"Summary of earlier conversation:\n{state['summary']}")
+    if recent:
+        lines = "\n".join(
+            f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.text[:RECENT_CHARS]}" for m in recent
+        )
+        parts.append(f"Recent conversation:\n{lines}")
+    return "\n\n".join(parts)
+
+
+def _agent_context(messages: list) -> list:
+    """Only the current turn (question, any rewrite, its tool calls/results).
+
+    The checkpointer keeps the whole chat, including every earlier tool result (paper chunks,
+    web pages). Sending all of it made each question bigger than the last, so long chats hit
+    Groq's tokens-per-minute limit and slowed down. Earlier turns reach the agent through
+    _memory_block instead.
+    """
+    last_h = max((i for i, m in enumerate(messages) if isinstance(m, HumanMessage)), default=0)
+    return _drop_orphan_tool_calls(messages[last_h:])
+
+
+def summarize_node(state: RAGState) -> dict:
+    """After the answer: fold turns that slid out of the recent window into the summary."""
+    convo = _conversation(state["messages"])
+    done = state.get("summarized_count", 0) or 0
+    upto = len(convo) - RECENT_MESSAGES
+    if upto - done < SUMMARY_BATCH:
+        return {}
+    batch = convo[done:upto]
+    # An old chat that predates the summary folds many turns at once; cap the total (~6k chars)
+    # so that one call stays inside the free tier's tokens-per-minute limit.
+    per_msg = max(300, min(1500, 6000 // len(batch)))
+    new = "\n".join(
+        f"{'User' if isinstance(m, HumanMessage) else 'Assistant'}: {m.text[:per_msg]}" for m in batch
+    )
+    try:
+        summary = summary_llm.invoke([
+            {"role": "system", "content": SUMMARY_SYSTEM},
+            {"role": "user", "content": f"Existing summary:\n{state.get('summary') or '(none)'}\n\nNew exchanges:\n{new}"},
+        ]).text.strip()
+    except Exception:
+        # The answer is already shown; a failed summary just retries on a later turn.
+        return {}
+    return {"summary": summary, "summarized_count": upto}
+
+
 def agent_node(state: RAGState) -> dict:
     current_attempts = state.get("retrieval_attempts", 0)
     # Once at the cap, use plain LLM so the agent cannot emit more tool calls.
@@ -215,7 +301,11 @@ def agent_node(state: RAGState) -> dict:
     # and this message's text is never used, so skip the LLM call at the cap.
     if current_attempts >= MAX_RETRIEVAL_ATTEMPTS:
         return {"messages": [AIMessage(content="Retrieval limit reached.")]}
-    messages = [{"role": "system", "content": RETRIEVE_SYSTEM}] + _drop_orphan_tool_calls(state["messages"])
+    system = RETRIEVE_SYSTEM
+    memory = _memory_block(state)
+    if memory:
+        system += "\n\nUse this conversation history to resolve follow-ups (\"it\", \"that paper\"):\n\n" + memory
+    messages = [{"role": "system", "content": system}] + _agent_context(state["messages"])
     response = retrieval_llm.invoke(messages)
     updates: dict = {"messages": [response]}
     if getattr(response, "tool_calls", None):
@@ -326,6 +416,11 @@ def verify_claim_node(state: RAGState) -> dict:
     }
 
 
+def _with_memory(state: RAGState) -> str:
+    memory = _memory_block(state)
+    return f"{memory}\n\n---\n\n" if memory else ""
+
+
 def generate_answer_node(state: RAGState) -> dict:
     route = state.get("route")
     query = state["query"]
@@ -343,7 +438,7 @@ def generate_answer_node(state: RAGState) -> dict:
                 answer = "I don't know the answer."
             else:
                 context = "\n\n---\n\n".join(doc.page_content for doc in docs)
-                prompt = f"Answer the question using this context:\n\n{context}\n\nQuestion: {query}"
+                prompt = f"{_with_memory(state)}Answer the question using this context:\n\n{context}\n\nQuestion: {query}"
                 answer = llm.invoke([{"role": "user", "content": prompt}]).text
 
     elif route == "verify_claim":
@@ -373,7 +468,7 @@ def generate_answer_node(state: RAGState) -> dict:
             )
 
     else:  # direct_answer
-        prompt = f"Answer from your knowledge.\n\nQuestion: {query}"
+        prompt = f"{_with_memory(state)}Answer from your knowledge.\n\nQuestion: {query}"
         answer = llm.invoke([{"role": "user", "content": prompt}]).text
 
     return {"answer": answer, "messages": [AIMessage(content=answer, name="answer")]}
@@ -422,6 +517,7 @@ def build_graph(db_path: str = "checkpoints.db"):
     graph.add_node("query_rewrite", query_rewrite_node)
     graph.add_node("verify_claim", verify_claim_node)
     graph.add_node("generate_answer", generate_answer_node)
+    graph.add_node("summarize", summarize_node)
 
     graph.set_entry_point("router")
 
@@ -454,7 +550,8 @@ def build_graph(db_path: str = "checkpoints.db"):
     graph.add_edge("query_rewrite", "agent_node")
 
     graph.add_edge("verify_claim", "generate_answer")
-    graph.add_edge("generate_answer", END)
+    graph.add_edge("generate_answer", "summarize")
+    graph.add_edge("summarize", END)
 
     return graph.compile(checkpointer=checkpointer)
 
