@@ -174,7 +174,11 @@ RELEVANCY_CHECK_SYSTEM = (
     "Return is_relevant=true if the chunks contain information that meaningfully "
     "addresses the question — even partially. "
     "Return is_relevant=false only if the chunks are clearly off-topic or contain "
-    "no useful information.\n\nBe lenient: if there is any substantive overlap, return true."
+    "no useful information.\n\nBe lenient: if there is any substantive overlap, return true.\n"
+    "Broad questions (summarise, key contributions, main results, what is this paper about) are "
+    "answered from the paper as a whole: if the chunks come from a paper or document the question "
+    "is about, return true even though no single chunk answers it fully.\n"
+    "Chunks may start mid-sentence; judge the topic, not the formatting."
 )
 
 relevancy_llm = llm.with_structured_output(RelevancyDecision)
@@ -313,10 +317,29 @@ def agent_node(state: RAGState) -> dict:
     return updates
 
 
+def _user_question(state: RAGState) -> str:
+    """The user's own question; state["query"] becomes the rewritten search query after a rewrite."""
+    for m in reversed(state["messages"]):
+        if isinstance(m, HumanMessage) and m.name != "query_rewrite":
+            return m.text
+    return state["query"]
+
+
+RELEVANCY_CHUNKS = 6
+RELEVANCY_CHARS = 600
+
+
 def relevancy_check_node(state: RAGState) -> dict:
-    query = state["query"]
+    # Judge against the user's question, not a rewritten search query: a rewrite like
+    # "...in each of the uploaded articles" made one paper's chunks look off-topic.
+    query = _user_question(state)
     docs = state.get("retrieved_docs") or []
-    doc_snippets = "\n\n---\n\n".join(doc.page_content[:300] for doc in docs[:3])
+    # Every chunk (up to 6) at 600 chars, with its source title; 3 x 300 chars was too little
+    # to judge and often only showed a chunk's ragged start.
+    doc_snippets = "\n\n---\n\n".join(
+        f"[{(doc.metadata or {}).get('title') or 'source'}] {doc.page_content[:RELEVANCY_CHARS]}"
+        for doc in docs[:RELEVANCY_CHUNKS]
+    )
     if not doc_snippets:
         return {"is_relevant": False}
     prompt = (
@@ -426,20 +449,28 @@ def generate_answer_node(state: RAGState) -> dict:
     query = state["query"]
 
     if route == "retrieve":
-        if state.get("is_relevant") is False and state.get("rewrite_count", 0) >= 1:
+        docs = state.get("retrieved_docs") or []
+        question = _user_question(state)
+        if not docs:
             answer = (
                 "I wasn't able to find relevant information in the uploaded papers "
                 "to answer your question. You may want to rephrase your question "
                 "or upload additional papers."
             )
         else:
-            docs = state.get("retrieved_docs") or []
-            if not docs:
-                answer = "I don't know the answer."
-            else:
-                context = "\n\n---\n\n".join(doc.page_content for doc in docs)
-                prompt = f"{_with_memory(state)}Answer the question using this context:\n\n{context}\n\nQuestion: {query}"
-                answer = llm.invoke([{"role": "user", "content": prompt}]).text
+            context = "\n\n---\n\n".join(doc.page_content for doc in docs)
+            # Still judged off-topic after a rewrite: answer from what was found, but say so,
+            # instead of a canned "couldn't find" that throws the retrieved chunks away.
+            weak = state.get("is_relevant") is False and state.get("rewrite_count", 0) >= 1
+            caution = (
+                "The retrieved context may only partly match the question. Answer only what it "
+                "supports, and say briefly what it does not cover.\n\n" if weak else ""
+            )
+            prompt = (
+                f"{_with_memory(state)}{caution}Answer the question using this context:\n\n{context}"
+                f"\n\nQuestion: {question}"
+            )
+            answer = llm.invoke([{"role": "user", "content": prompt}]).text
 
     elif route == "verify_claim":
         verdict = state.get("claim_verdict", "")
