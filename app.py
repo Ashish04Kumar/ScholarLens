@@ -5,7 +5,6 @@ import re
 import shutil
 import tempfile
 import traceback
-import urllib.parse
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -16,7 +15,7 @@ from langchain_core.messages import AIMessageChunk, HumanMessage
 
 from backend.btw_handler import handle_btw
 from backend.llm import FallbackLLM, fallback_calls
-from backend.paper_loader import load_arxiv, load_document, load_webpage, pdf_limit_error
+from backend.paper_loader import load_arxiv, load_document, load_webpage
 from backend.rag_graph import build_graph
 from backend.vector_store import add_paper, delete_paper, delete_session_collections, list_papers
 
@@ -1499,7 +1498,7 @@ def _index(docs, session_id: str, progress, start: float, end: float) -> None:
 
 def _load_arxiv_into(session_id: str, query: str, progress) -> str:
     progress(0.05, "Downloading and reading the PDF from ArXiv")
-    docs = load_arxiv(query, max_pages=MAX_PAPER_PAGES, max_mb=MAX_UPLOAD_MB)
+    docs = load_arxiv(query)
     progress(0.25, f"Split into {len(docs)} chunks")
     _index(docs, session_id, progress, 0.25, 0.9)
     pdf_url = docs[0].metadata.get("pdf_url") if docs else None
@@ -1536,19 +1535,11 @@ def _load_file_into(session_id: str, name: str, data: bytes, progress) -> str:
 
 def _load_url_into(session_id: str, url: str, progress) -> str:
     progress(0.05, "Fetching the web page")
-    docs = load_webpage(url, max_pages=MAX_PAPER_PAGES, max_mb=MAX_UPLOAD_MB)
+    docs = load_webpage(url)
     progress(0.2, f"Split into {len(docs)} chunks")
     _index(docs, session_id, progress, 0.2, 0.97)
     title = docs[0].metadata.get("title") or url
-    cached = docs[0].metadata.get("pdf_cache_path")
-    if cached and Path(cached).exists():
-        # A link to a PDF: keep the file so the viewer can show its pages, like an upload.
-        name = Path(urllib.parse.urlparse(url).path).name or "document.pdf"
-        pdf_path = store_file(session_id, name if name.lower().endswith(".pdf") else f"{name}.pdf",
-                              Path(cached).read_bytes())
-        save_source(session_id, title, "file", path=pdf_path, url=url)
-    else:
-        save_source(session_id, title, "web", url=url)
+    save_source(session_id, title, "web", url=url)
     return title
 
 
@@ -2144,29 +2135,20 @@ with st.sidebar:
         )
         if uploaded_files:
             done = st.session_state.get(f"processed_files_{active_sid}", set())
-            new, rejected = [], []
+            new, too_big = [], []
             for f in uploaded_files:
-                if f.name in done:
-                    continue
-                # Size and page limits are checked here, before the loader starts,
-                # so the user hears about it right away and no API quota is spent.
                 if f.size > MAX_UPLOAD_MB * 1024 * 1024:
-                    rejected.append(f"{f.name} is {f.size / 1024 / 1024:.1f} MB. "
-                                    f"Files must be {MAX_UPLOAD_MB} MB or smaller.")
-                    continue
-                data = f.getvalue()
-                problem = (pdf_limit_error(data, f.name, MAX_PAPER_PAGES, MAX_UPLOAD_MB)
-                           if f.name.lower().endswith(".pdf") else None)
-                if problem:
-                    rejected.append(problem)
-                else:
-                    new.append((f.name, data))
+                    too_big.append(f"{f.name} ({f.size / 1024 / 1024:.1f} MB)")
+                elif f.name not in done:
+                    new.append((f.name, f.getvalue()))
             st.session_state[f"uploader_n_{active_sid}"] = uploader_n + 1
-            for problem in rejected:
-                st.session_state.setdefault("source_errors", []).append(f"Not added: {problem}")
+            for name in too_big:
+                st.session_state.setdefault("source_errors", []).append(
+                    f"Skipped {name}: files must be {MAX_UPLOAD_MB} MB or smaller."
+                )
             if new:
                 queue_load("file", new)
-            if not rejected:
+            if not too_big:
                 st.toast("These files are already loaded.", icon=":material/info:")
             st.rerun()
 
