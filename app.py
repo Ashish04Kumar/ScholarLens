@@ -633,7 +633,7 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
     position: relative; width: 36px !important; height: 36px !important; min-height: 36px !important;
     padding: 0 !important; border-radius: 50% !important;
     background: var(--sl-surface) !important; border: 1px solid var(--sl-glass-edge) !important;
-    box-shadow: var(--sl-shadow-lg); transition: transform .2s ease, background .2s ease;
+    box-shadow: var(--sl-shadow-lg); transition: transform .2s ease;
 }
 .st-key-details_on button > *, .st-key-details_off button > * { display: none !important; }
 .st-key-details_on button::before, .st-key-details_off button::before {
@@ -645,26 +645,25 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 .st-key-details_on button { background: var(--sl-accent) !important; border-color: var(--sl-accent) !important; }
 .st-key-details_on button::before { background: var(--sl-on-accent); }
 .st-key-details_on button:hover, .st-key-details_off button:hover { transform: translateY(-1px); }
-/* Trace: same round button, left of Details */
-.st-key-trace_on, .st-key-trace_off {
-    position: fixed !important; top: .65rem; right: calc(1rem + 126px); z-index: 1000000; width: auto !important;
-}
-.st-key-trace_on button, .st-key-trace_off button {
-    position: relative; width: 36px !important; height: 36px !important; min-height: 36px !important;
-    padding: 0 !important; border-radius: 50% !important;
+/* Trace: same round button, left of Details (a plain DOM button, see the Trace toggle script) */
+#sl-trace-btn {
+    position: fixed; top: .65rem; right: calc(1rem + 126px); z-index: 1000000;
+    width: 36px; height: 36px; padding: 0; border-radius: 50%; cursor: pointer;
     background: var(--sl-surface) !important; border: 1px solid var(--sl-glass-edge) !important;
-    box-shadow: var(--sl-shadow-lg); transition: transform .2s ease, background .2s ease;
+    box-shadow: var(--sl-shadow-lg); transition: transform .2s ease;
 }
-.st-key-trace_on button > *, .st-key-trace_off button > * { display: none !important; }
-.st-key-trace_on button::before, .st-key-trace_off button::before {
+#sl-trace-btn::before {
     content: ""; position: absolute; inset: 0; margin: auto; width: 17px; height: 17px;
     background: var(--sl-muted);
     -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-4l-3 9L9 3l-3 9H2'/%3E%3C/svg%3E") center / contain no-repeat;
     mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M22 12h-4l-3 9L9 3l-3 9H2'/%3E%3C/svg%3E") center / contain no-repeat;
 }
-.st-key-trace_on button { background: var(--sl-accent) !important; border-color: var(--sl-accent) !important; }
-.st-key-trace_on button::before { background: var(--sl-on-accent); }
-.st-key-trace_on button:hover, .st-key-trace_off button:hover { transform: translateY(-1px); }
+#sl-trace-btn.on { background: var(--sl-accent) !important; border-color: var(--sl-accent) !important; }
+#sl-trace-btn.on::before { background: var(--sl-on-accent); }
+#sl-trace-btn:hover { transform: translateY(-1px); }
+/* trace off: hide the live trace and the saved "Pipeline trace" expanders */
+body[data-sl-trace="off"] [data-testid="stElementContainer"]:has(.sl-trace),
+body[data-sl-trace="off"] [class*="st-key-tracebox_"] { display: none !important; }
 .sl-trace {
     margin: .2rem 0 .8rem; padding: .7rem .8rem; border-radius: 12px;
     background: var(--sl-surface-2); border: 1px solid var(--sl-border); font-size: .8rem; line-height: 1.45;
@@ -1081,8 +1080,7 @@ body:has([data-baseweb="modal"]) .st-key-theme_toggle,
 body:has([data-baseweb="modal"]) .st-key-tips_pop,
 body:has([data-baseweb="modal"]) .st-key-details_on,
 body:has([data-baseweb="modal"]) .st-key-details_off,
-body:has([data-baseweb="modal"]) .st-key-trace_on,
-body:has([data-baseweb="modal"]) .st-key-trace_off { visibility: hidden; }
+body:has([data-baseweb="modal"]) #sl-trace-btn { visibility: hidden; }
 
 .sl-mobile-header { display: none; }
 
@@ -1112,13 +1110,13 @@ body:has([data-baseweb="modal"]) .st-key-trace_off { visibility: hidden; }
 
     /* Three round 34px buttons, flush right, 6px apart */
     .st-key-theme_toggle, .st-key-tips_pop, .st-key-details_on, .st-key-details_off,
-    .st-key-trace_on, .st-key-trace_off { top: 11px !important; z-index: 999990; }
-    .st-key-trace_on, .st-key-trace_off { right: calc(.75rem + 114px) !important; }
+    #sl-trace-btn { top: 11px !important; z-index: 999990; }
+    #sl-trace-btn { right: calc(.75rem + 114px) !important; }
     .st-key-theme_toggle { right: .75rem !important; }
     .st-key-tips_pop { right: calc(.75rem + 38px) !important; }
     .st-key-details_on, .st-key-details_off { right: calc(.75rem + 76px) !important; }
     .st-key-theme_toggle button, .st-key-tips_pop button, .st-key-details_on button, .st-key-details_off button,
-    .st-key-trace_on button, .st-key-trace_off button {
+    #sl-trace-btn {
         width: 32px !important; height: 32px !important; min-height: 32px !important;
         padding: 0 !important; border-radius: 50% !important; box-shadow: none !important;
         justify-content: center !important;
@@ -1153,8 +1151,7 @@ body:has([data-baseweb="modal"]) .st-key-trace_off { visibility: hidden; }
     body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-tips_pop,
     body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-details_on,
     body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-details_off,
-    body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-trace_on,
-    body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-trace_off { display: none !important; }
+    body:has([data-testid="stSidebar"][aria-expanded="true"]) #sl-trace-btn { display: none !important; }
 
     .sl-brand { margin-right: 3rem; }
 
@@ -2514,19 +2511,39 @@ if st.button(
     st.rerun()
 
 # ── Pipeline trace on/off (round button next to Details) ──────────────────────
-trace_on = st.session_state.get("show_trace", True)
-if st.button(
-    "Trace",
-    key="trace_on" if trace_on else "trace_off",
-    help=(
-        "Live trace is ON: each step (router, agent, search, checks), what it decided, "
-        "and the LLM calls with tokens and time. Click to turn off."
-        if trace_on
-        else "Show a live trace of each step and its LLM calls (tokens, time, errors)."
-    ),
-):
-    st.session_state.show_trace = not trace_on
-    st.rerun()
+# Browser-only: a Streamlit button would rerun the script, and a rerun stops an answer
+# that is being written. This one just flips a flag on <body> that CSS uses to hide the
+# trace (which is always rendered), and remembers the choice in localStorage.
+components.html(
+    """
+    <script>
+    const doc = window.parent.document;
+    const KEY = "sl_trace";
+    const read = () => { try { return localStorage.getItem(KEY) !== "off"; } catch (e) { return true; } };
+    const apply = (on) => {
+      doc.body.dataset.slTrace = on ? "on" : "off";
+      const b = doc.getElementById("sl-trace-btn");
+      if (b) {
+        b.classList.toggle("on", on);
+        b.title = on ? "Live trace is ON: each step, its decision and the LLM calls (tokens, time, errors). Click to hide."
+                     : "Show the live trace of each step and its LLM calls (tokens, time, errors).";
+      }
+    };
+    if (!doc.getElementById("sl-trace-btn")) {
+      const b = doc.createElement("button");
+      b.id = "sl-trace-btn"; b.type = "button"; b.setAttribute("aria-label", "Toggle pipeline trace");
+      b.addEventListener("click", () => {
+        const on = doc.body.dataset.slTrace !== "on";
+        try { localStorage.setItem(KEY, on ? "on" : "off"); } catch (e) {}
+        apply(on);
+      });
+      doc.body.appendChild(b);
+    }
+    apply(read());
+    </script>
+    """,
+    height=0,
+)
 
 # ── Theme toggle (pinned to the page's top-right corner via CSS) ──────────────
 is_dark = theme == "dark"
@@ -2646,8 +2663,8 @@ for idx, msg in enumerate(history):
         if msg["role"] == "assistant":
             render_meta(msg.get("meta"))
             # Only rendered (and sent to the browser) when the developer toggle is on.
-            if st.session_state.get("show_trace", True) and msg.get("trace"):
-                with st.expander("Pipeline trace", expanded=False, icon=":material/route:"):
+            if msg.get("trace"):
+                with st.container(key=f"tracebox_{active_sid}_{idx}"), st.expander("Pipeline trace", expanded=False, icon=":material/route:"):
                     st.markdown(render_trace_html(msg["trace"]), unsafe_allow_html=True)
             if st.session_state.get("show_details") and msg.get("graph_state"):
                 with st.expander("Details", expanded=False, icon=":material/data_object:"):
@@ -2723,9 +2740,8 @@ if prompt:
         with st.container(key=f"live_a_{active_sid}_{len(history)}"), st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
             status = st.status("Thinking", expanded=False)
             fallback_before = fallback_calls()
-            # Live trace sits between the status line and the answer.
-            show_trace = st.session_state.get("show_trace", True)
-            trace_slot = st.empty() if show_trace else None
+            # Live trace sits between the status line and the answer (hidden by CSS when off).
+            trace_slot = st.empty()
             placeholder = st.empty()
             # Clicking any widget during a run makes Streamlit stop it and rerun; the
             # next run sees stop_gen=True and keeps whatever was written so far.
