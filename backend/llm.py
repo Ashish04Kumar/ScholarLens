@@ -18,10 +18,11 @@ GROQ_MODEL = CHAT_MODEL
 FALLBACK_MODEL = FALLBACK_CHAT_MODEL
 
 # gpt-oss on Groq sometimes emits a malformed tool call (e.g. a tool name with a
-# leaked "<|channel|>commentary" token), which Groq rejects with a 400. It is
-# random, so retrying usually succeeds. Same for JSON with a wrong/missing key.
+# leaked "<|channel|>commentary" token, or a call missing a required argument).
+# Groq rejects it with a 400, or with a plain APIError when it happens mid-stream.
+# It is random, so retrying usually succeeds. Same for JSON with a wrong/missing key.
 GROQ_TOOL_RETRY = dict(
-    retry_if_exception_type=(groq.BadRequestError, OutputParserException), stop_after_attempt=3
+    retry_if_exception_type=(groq.APIError, OutputParserException), stop_after_attempt=3
 )
 
 

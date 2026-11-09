@@ -2189,7 +2189,7 @@ if prompt:
             # next run sees stop_gen=True and keeps whatever was written so far.
             # Drawn in the bottom bar (same container as the chat input) and pinned by CSS
             # inside the input box, next to the send button.
-            stop_slot = st._bottom.empty()
+            stop_slot = st.bottom.empty()
             stop_slot.button("", key="stop_gen", icon=":material/stop:", help="Stop generating")
             st.session_state._partial = {"session_id": active_sid, "text": "", "turn": current_turn}
             response_text = ""

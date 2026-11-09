@@ -35,7 +35,7 @@ def _stamp_title(docs: list[Document], title: str) -> list[Document]:
 
 # Scanned PDFs have no text layer, so empty pages are OCR'd with Tesseract.
 # Only installed language packs are used (e.g. Marathi needs tesseract-ocr-mar).
-OCR_LANGUAGES = ("eng", "mar", "hin")
+OCR_LANGUAGES = ("eng", "hin")
 OCR_DPI = 300
 
 
