@@ -304,6 +304,7 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
     border: 1px solid var(--sl-glass-edge) !important; box-shadow: var(--sl-shadow-lg);
     transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
 }
+[class*="st-key-example_"] button:disabled { opacity: .5; cursor: not-allowed !important; transform: none !important; }
 [class*="st-key-example_"] button:hover {
     transform: translateY(-1px);
     border-color: var(--sl-accent) !important;
@@ -980,6 +981,86 @@ div[role="dialog"] { border-radius: 20px !important; }
     background: var(--sl-surface) !important;
 }
 
+
+/* Top-right buttons never cover an open dialog */
+body:has([data-baseweb="modal"]) .st-key-theme_toggle,
+body:has([data-baseweb="modal"]) .st-key-tips_pop,
+body:has([data-baseweb="modal"]) .st-key-details_on,
+body:has([data-baseweb="modal"]) .st-key-details_off { visibility: hidden; }
+
+.sl-mobile-header { display: none; }
+
+/* ── Mobile (≤ 768px) ─────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+    /* Header bar holding the menu button, brand and the three action buttons */
+    .sl-mobile-header {
+        display: flex; align-items: center;
+        position: fixed; top: 0; left: 0; right: 0; height: 56px; z-index: 999980;
+        padding: 0 .75rem 0 3.4rem;
+        background: var(--sl-surface-solid);
+        border-bottom: 1px solid var(--sl-border);
+        box-shadow: var(--sl-shadow);
+    }
+    .sl-mh-brand { display: flex; align-items: center; gap: .5rem; font-weight: 700; font-size: 1rem; color: var(--sl-text); letter-spacing: -0.02em; }
+    .sl-mh-logo { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 7px; background: var(--sl-accent); color: var(--sl-on-accent); }
+    [data-testid="stExpandSidebarButton"] {
+        position: fixed !important; top: 10px; left: .6rem; z-index: 999990;
+        width: 36px; height: 36px; box-shadow: none !important;
+    }
+    .st-key-theme_toggle { top: 10px; right: .6rem; z-index: 999990; }
+    .st-key-theme_toggle button { padding: .25rem .7rem !important; box-shadow: none; }
+    .st-key-tips_pop { top: 10px; right: calc(.6rem + 84px); z-index: 999990; }
+    .st-key-details_on, .st-key-details_off { top: 10px; right: calc(.6rem + 84px + 42px); z-index: 999990; }
+    .st-key-tips_pop button, .st-key-details_on button, .st-key-details_off button { box-shadow: none; }
+
+    /* Sidebar opens full screen and covers the header + its buttons */
+    [data-testid="stSidebar"][aria-expanded="true"] {
+        width: 100vw !important; min-width: 100vw !important; max-width: 100vw !important;
+        z-index: 1000001 !important;
+    }
+    [data-testid="stSidebar"][aria-expanded="true"] > div { width: 100vw !important; }
+    /* solid background: the glass sidebar let the chat show through on phones */
+    [data-testid="stSidebar"] { background: var(--sl-bg) !important; backdrop-filter: none !important; }
+    [data-testid="stSidebarContent"] { scrollbar-width: none; }
+    [data-testid="stSidebarContent"]::-webkit-scrollbar { width: 0; height: 0; }
+    body:has([data-testid="stSidebar"][aria-expanded="true"]) .sl-mobile-header,
+    body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-theme_toggle,
+    body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-tips_pop,
+    body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-details_on,
+    body:has([data-testid="stSidebar"][aria-expanded="true"]) .st-key-details_off { display: none !important; }
+    [data-testid="stSidebarHeader"] { top: .75rem; right: .75rem; }
+    .sl-brand { margin-right: 3rem; }
+
+    /* Page spacing below the header */
+    .block-container { padding: 4.4rem .9rem 6.5rem !important; }
+
+    /* Welcome screen */
+    .sl-welcome { margin: 1.2rem 0 1.4rem; }
+    .sl-welcome h1 { font-size: 1.65rem; }
+    .sl-welcome p { font-size: .9rem; }
+    .sl-mark { width: 46px; height: 46px; border-radius: 14px; }
+    .sl-notice { padding: .75rem .85rem; }
+
+    /* Messages */
+    [data-testid="stChatMessage"] { gap: .5rem; margin-bottom: 1rem; }
+    [data-testid="stChatMessage"] img,
+    [data-testid="stChatMessage"] [data-testid*="Avatar"] { width: 28px !important; height: 28px !important; }
+    [data-testid="stChatMessage"]:not(:has(.sl-user)) { max-width: 100%; }
+    [data-testid="stChatMessage"]:not(:has(.sl-user)) [data-testid="stChatMessageContent"] { padding: .8rem .9rem 1rem; }
+    [data-testid="stChatMessage"]:has(.sl-user) { max-width: 88%; }
+    [data-testid="stChatMessage"] p, [data-testid="stChatMessage"] li { font-size: .92rem; }
+
+    /* Compact one-line chat input */
+    [data-testid="stBottomBlockContainer"] { padding: .5rem .7rem .7rem !important; }
+    [data-testid="stChatInput"] { border-radius: 16px !important; }
+    [data-testid="stChatInput"] textarea { font-size: .92rem !important; min-height: 0 !important; }
+    [data-testid="stChatInput"] textarea::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .st-key-stop_gen { right: calc(.7rem + 15px); bottom: calc(.7rem + 9px); }
+
+    /* Document viewer header stacks nicely */
+    .st-key-viewer_head { top: 60px; }
+}
+
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-thumb { background: var(--sl-border-strong); border-radius: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -1195,6 +1276,22 @@ def scroll_to_bottom() -> None:
         };
         scroll();
         [150, 400, 900].forEach(t => setTimeout(scroll, t));
+        </script>
+        """,
+        height=0,
+    )
+
+
+def close_sidebar_on_mobile() -> None:
+    """On phones the sidebar is full screen; close it after picking a chat or document."""
+    components.html(
+        """
+        <script>
+        const w = window.parent;
+        if (w.innerWidth <= 768) {
+          const btn = w.document.querySelector('[data-testid="stSidebarCollapseButton"] button');
+          if (btn) btn.click();
+        }
         </script>
         """,
         height=0,
@@ -1770,6 +1867,7 @@ with st.sidebar:
         new_sid = create_session()
         st.session_state.active_session_id = new_sid
         active_sid = new_sid
+        st.session_state._close_sidebar_mobile = True
         st.rerun()
 
     sorted_sessions = sorted(
@@ -1833,6 +1931,7 @@ with st.sidebar:
                              help=f"Started {chat_started(session['created_at'])}") and not is_active:
                     with st.spinner("Opening chat…"):
                         switch_session(sid)
+                    st.session_state._close_sidebar_mobile = True
                     st.rerun()
                 if st.button("", key=f"trash_{sid}", icon=":material/delete:", help="Delete chat"):
                     st.session_state.pending_delete = sid
@@ -1968,6 +2067,7 @@ with st.sidebar:
             c_doc, c_del = st.columns([6, 1], gap="small", vertical_alignment="center")
             if c_doc.button(t, key=f"doc_{i}", icon=doc_icon, use_container_width=True, help="Open document"):
                 st.session_state.viewing_doc = {"session_id": active_sid, "title": t}
+                st.session_state._close_sidebar_mobile = True
                 st.rerun()
             if c_del.button("", key=f"trash_doc_{i}", icon=":material/delete:", help="Remove document"):
                 st.session_state.pending_doc_delete = t
@@ -1975,6 +2075,16 @@ with st.sidebar:
     else:
         st.caption("No documents yet. Add files, web pages, or ArXiv papers above.")
 
+
+if st.session_state.pop("_close_sidebar_mobile", False):
+    close_sidebar_on_mobile()
+
+# ── Mobile header bar (hidden on desktop; the 3 round buttons sit on it) ──────────
+st.markdown(
+    f'<div class="sl-mobile-header"><div class="sl-mh-brand">'
+    f'<span class="sl-mh-logo">{icon("book", 14)}</span>ScholarLens</div></div>',
+    unsafe_allow_html=True,
+)
 
 # ── Tips (round ⚡ button next to the theme toggle) ─────────────────────────────
 with st.popover("Tips", key="tips_pop", help="Tips"):
@@ -2053,8 +2163,6 @@ if not history and not prompt:
         st.markdown(
             f"""
             <div class="sl-welcome">
-              <div class="sl-mark">{icon("book", 24)}</div>
-              <span class="sl-pill">{icon("file", 12)} Research workspace</span>
               <h1>What would you like to <span class="sl-grad-text">research</span> today?</h1>
               <p>Ask questions about your papers, verify claims against recent literature,
               or survey the latest work. Every answer is grounded in its sources.</p>
@@ -2064,13 +2172,17 @@ if not history and not prompt:
         )
         st.markdown(scope_notice(), unsafe_allow_html=True)
         cols = st.columns(2)
+        has_papers = bool(doc_titles)
         for i, (ex_icon, title, subtitle, example) in enumerate(EXAMPLE_PROMPTS):
+            # Summarizing needs at least one paper in this chat.
+            needs_paper = title == "Summarize" and not has_papers
             if cols[i % 2].button(
                 f"**{title}** · {subtitle}",
                 key=f"example_{i}",
                 icon=ex_icon,
                 use_container_width=True,
-                help=example,
+                disabled=needs_paper,
+                help="Add at least one paper from the sidebar to summarize it." if needs_paper else example,
             ):
                 st.session_state.pending_prompt = example
                 st.rerun()
