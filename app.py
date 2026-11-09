@@ -13,7 +13,7 @@ import streamlit.components.v1 as components
 from langchain_core.messages import AIMessageChunk, HumanMessage
 
 from backend.btw_handler import handle_btw
-from backend.llm import FallbackLLM
+from backend.llm import FallbackLLM, fallback_calls
 from backend.paper_loader import load_arxiv, load_document, load_webpage
 from backend.rag_graph import build_graph
 from backend.vector_store import add_paper, delete_paper, delete_session_collections, list_papers
@@ -419,6 +419,7 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
     transition: border-color .2s ease, color .2s ease;
 }
 .sl-badge:hover { border-color: var(--sl-accent); color: var(--sl-text); }
+.sl-badge.sl-fallback { color: #B45309; background: rgba(217,119,6,0.09); border-color: rgba(217,119,6,0.3); }
 .sl-badge.sl-route { color: var(--sl-accent-text); background: var(--sl-accent-soft); border-color: transparent; font-weight: 600; }
 
 /* ── Chat input: glass with animated gradient ring on focus ─────────────── */
@@ -1334,6 +1335,39 @@ def close_sidebar_on_mobile() -> None:
     )
 
 
+def friendly_error(e: Exception, context: str = "answer") -> str:
+    """Turn a raw exception into a short message a user can act on.
+
+    The raw error is still printed to the terminal / shown under "Technical details".
+    """
+    if isinstance(e, ValueError) and context == "source":
+        return str(e)  # our loaders already raise readable messages
+    text = f"{type(e).__name__} {e}".lower()
+    if any(k in text for k in ("429", "rate limit", "ratelimit", "too many requests", "resource_exhausted", "quota")):
+        return ("The service is busy right now (usage limit reached). Please wait a minute and try again."
+                if context == "source"
+                else "The AI service is busy right now (usage limit reached). Please wait a minute and try again.")
+    if any(k in text for k in ("401", "403", "unauthorized", "invalid api key", "api key", "permission")):
+        return "An API key is missing or invalid on the server. Please check the configuration."
+    if "balance" in text or "billing" in text:
+        return "The backup AI service has a billing issue, and the main one is unavailable."
+    if any(k in text for k in ("timeout", "timed out", "connecterror", "connection", "name resolution", "unreachable")):
+        return "Couldn't reach an online service. Check the internet connection and try again."
+    if "qdrant" in text:
+        return "Couldn't reach the paper database. Please try again in a moment."
+    if "tavily" in text:
+        return "Web search is unavailable right now. Please try again in a moment."
+    if "cohere" in text or "embed" in text:
+        return "The text-processing (embedding) service failed. Please try again in a moment."
+    return ("Something went wrong while adding this source." if context == "source"
+            else "Something went wrong while generating the answer.")
+
+
+def show_error_details(e: Exception) -> None:
+    with st.expander("Technical details", icon=":material/bug_report:"):
+        st.code(f"{type(e).__name__}: {str(e)[:1500]}", language=None)
+
+
 def md_text(text: str) -> str:
     """Escape "$" so prices like "$5 … $24" aren't rendered as LaTeX math by Streamlit."""
     return text.replace("$", r"\$")
@@ -1488,7 +1522,10 @@ def process_pending_load() -> None:
             progress(1.0, "Done")
             st.toast(f"Added {done}", icon=":material/check_circle:")
         except Exception as e:
-            st.session_state.setdefault("source_errors", []).append(f"Failed: {str(label)[:60]} — {e}")
+            traceback.print_exc()
+            st.session_state.setdefault("source_errors", []).append(
+                f"Couldn't add {str(label)[:60]}: {friendly_error(e, 'source')}"
+            )
     cached_list_papers.clear()
     overlay.empty()
 
@@ -1675,6 +1712,11 @@ def render_meta(meta: dict | None) -> None:
     if meta.get("route") in ROUTE_BADGES:
         icon_name, label = ROUTE_BADGES[meta["route"]]
         badges.append(f'<span class="sl-badge sl-route">{icon(icon_name, 12)} {label}</span>')
+    if meta.get("fallback"):
+        badges.append(
+            f'<span class="sl-badge sl-fallback" title="The main model was unavailable, so a backup model answered.">'
+            f'{icon("alert", 12)} via fallback model</span>'
+        )
     for src in meta.get("sources", []):
         badges.append(f'<span class="sl-badge">{icon("link", 12)} {html.escape(src[:48])}</span>')
     if badges:
@@ -1820,14 +1862,21 @@ def load_session_chats(session_id: str) -> list[dict]:
 
 def delete_session(session_id: str) -> None:
     """Remove a session everywhere: chat history, vector store, session list, UI state."""
+    problems = []
     try:
         graph.checkpointer.delete_thread(session_id)
-    except Exception:
-        pass
+    except Exception as e:
+        traceback.print_exc()
+        problems.append(f"chat history ({friendly_error(e, 'source')})")
     try:
         delete_session_collections(session_id)
-    except Exception:
-        pass
+    except Exception as e:
+        traceback.print_exc()
+        problems.append(f"its documents in the paper database ({friendly_error(e, 'source')})")
+    if problems:
+        st.session_state.setdefault("source_errors", []).append(
+            "Chat removed, but couldn't delete " + " and ".join(problems)
+        )
     st.session_state.sessions_meta.pop(session_id, None)
     save_sessions(st.session_state.sessions_meta)
     st.session_state.chats.pop(session_id, None)
@@ -2105,7 +2154,10 @@ with st.sidebar:
                         remove_document(active_sid, t)
                         st.toast(f"Removed {t}", icon=":material/delete:")
                     except Exception as e:
-                        st.session_state.setdefault("source_errors", []).append(f"Could not remove {t[:60]} — {e}")
+                        traceback.print_exc()
+                        st.session_state.setdefault("source_errors", []).append(
+                            f"Couldn't remove {t[:60]}: {friendly_error(e, 'source')}"
+                        )
                     st.session_state.pending_doc_delete = None
                     st.session_state.deleting_doc = None
                     st.rerun()
@@ -2302,10 +2354,15 @@ if prompt:
                 placeholder = st.empty()
                 placeholder.markdown("_Thinking…_")
                 response_text = ""
-                for chunk in handle_btw(query):
-                    response_text += chunk
-                    placeholder.markdown(md_text(response_text) + "▌")
-                placeholder.markdown(md_text(response_text))
+                try:
+                    for chunk in handle_btw(query):
+                        response_text += chunk
+                        placeholder.markdown(md_text(response_text) + "▌")
+                    placeholder.markdown(md_text(response_text))
+                except Exception as e:
+                    traceback.print_exc()
+                    placeholder.markdown(md_text(f"⚠️ {friendly_error(e)}"))
+                    show_error_details(e)
             st.caption(":material/forum: Side question — not saved to this chat.")
 
     else:
@@ -2349,6 +2406,7 @@ if prompt:
 
         with st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
             status = st.status("Thinking…", expanded=False)
+            fallback_before = fallback_calls()
             placeholder = st.empty()
             # Clicking any widget during a run makes Streamlit stop it and rerun; the
             # next run sees stop_gen=True and keeps whatever was written so far.
@@ -2395,6 +2453,7 @@ if prompt:
                 final_values = graph.get_state(config).values
                 state_snapshot = _serialize_state(final_values)
                 meta = answer_meta(state_snapshot)
+                meta["fallback"] = fallback_calls() > fallback_before
                 render_meta(meta)
 
                 if st.session_state.get("show_details"):
@@ -2403,11 +2462,11 @@ if prompt:
             except Exception as e:
                 traceback.print_exc()
                 status.update(label="Failed", state="error")
-                response_text = (
-                    f"⚠️ Couldn't generate a response: {str(e)[:300]}\n\n"
-                    "Please send your message again."
-                )
+                stop_slot.empty()
+                st.session_state.pop("_partial", None)
+                response_text = f"⚠️ {friendly_error(e)}"
                 placeholder.markdown(md_text(response_text))
+                show_error_details(e)
 
         st.session_state.chats[active_sid].append(
             {

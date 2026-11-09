@@ -1,4 +1,5 @@
 import sys
+import threading
 
 import groq
 from dotenv import load_dotenv
@@ -33,6 +34,24 @@ class _LogGroqErrors(BaseCallbackHandler):
         print(f"[groq failed] {type(error).__name__}: {str(error)[:300]}", file=sys.stderr, flush=True)
 
 
+_fallback_lock = threading.Lock()
+_fallback_calls = 0
+
+
+class _CountFallback(BaseCallbackHandler):
+    """Counts calls that reached the fallback model (Groq failed)."""
+
+    def on_chat_model_start(self, *args, **kwargs):
+        global _fallback_calls
+        with _fallback_lock:
+            _fallback_calls += 1
+
+
+def fallback_calls() -> int:
+    """Number of fallback (Gemini) calls so far; compare before/after a run."""
+    return _fallback_calls
+
+
 class FallbackLLM(Runnable):
     """Groq as primary, Gemini as fallback.
 
@@ -44,7 +63,7 @@ class FallbackLLM(Runnable):
     def __init__(self, groq_model: str = GROQ_MODEL):
         # Free tier is ~8k tokens/min; retry (honours retry-after) before falling back to Gemini.
         self.primary = ChatGroq(model=groq_model, max_retries=6, callbacks=[_LogGroqErrors()])
-        self.fallback = ChatGoogleGenerativeAI(model=FALLBACK_MODEL)
+        self.fallback = ChatGoogleGenerativeAI(model=FALLBACK_MODEL, callbacks=[_CountFallback()])
         self._chat = self.primary.with_fallbacks([self.fallback])
 
     def invoke(self, input, config=None, **kwargs):
