@@ -60,9 +60,18 @@ class FallbackLLM(Runnable):
     and then wrapped in fallbacks.
     """
 
-    def __init__(self, groq_model: str = GROQ_MODEL):
+    def __init__(self, groq_model: str = GROQ_MODEL, fast: bool = False):
         # Free tier is ~8k tokens/min; retry (honours retry-after) before falling back to Gemini.
-        self.primary = ChatGroq(model=groq_model, max_retries=6, callbacks=[_LogGroqErrors()])
+        # fast=True: low reasoning effort for plain calls too (e.g. naming a chat).
+        self.primary = ChatGroq(
+            model=groq_model, max_retries=6, callbacks=[_LogGroqErrors()],
+            reasoning_effort="low" if fast else None,
+        )
+        # Routing / grading / tool choice are small decisions: low reasoning effort keeps them
+        # fast. The final answer still uses the model's default effort (self.primary).
+        self.primary_fast = ChatGroq(
+            model=groq_model, max_retries=6, callbacks=[_LogGroqErrors()], reasoning_effort="low",
+        )
         self.fallback = ChatGoogleGenerativeAI(model=FALLBACK_MODEL, callbacks=[_CountFallback()])
         self._chat = self.primary.with_fallbacks([self.fallback])
 
@@ -80,7 +89,7 @@ class FallbackLLM(Runnable):
 
     def with_structured_output(self, schema, **kwargs) -> Runnable:
         # Groq's gpt-oss models often skip the forced tool call in function-calling mode; JSON schema is reliable.
-        primary = self.primary.with_structured_output(schema, method="json_schema", **kwargs)
+        primary = self.primary_fast.with_structured_output(schema, method="json_schema", **kwargs)
         return primary.with_retry(**GROQ_TOOL_RETRY).with_fallbacks(
             [self.fallback.with_structured_output(schema, **kwargs)]
         )
@@ -90,7 +99,7 @@ class FallbackLLM(Runnable):
         if parallel_tool_calls is not None:
             groq_kwargs["parallel_tool_calls"] = parallel_tool_calls
         # Gemini doesn't accept `parallel_tool_calls`; the system prompt already asks for one tool per turn.
-        primary = self.primary.bind_tools(tools, **groq_kwargs)
+        primary = self.primary_fast.bind_tools(tools, **groq_kwargs)
         return primary.with_retry(**GROQ_TOOL_RETRY).with_fallbacks(
             [self.fallback.bind_tools(tools, **kwargs)]
         )

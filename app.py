@@ -42,7 +42,7 @@ NODE_STATUS = {
     "verify_claim": "Verifying the claim against recent papers…",
     "generate_answer": "Writing the answer…",
 }
-_rename_llm = FallbackLLM()
+_rename_llm = FallbackLLM(fast=True)
 
 ASSETS = Path(__file__).parent / "assets"
 USER_AVATAR = str(ASSETS / "user_avatar.svg")
@@ -207,18 +207,15 @@ html, body, .stApp, button, input, textarea, [data-testid="stMarkdownContainer"]
 .stApp::before {
     top: -22vmax; left: -12vmax;
     background: radial-gradient(circle, var(--sl-blob-1), transparent 65%);
-    animation: sl-float-a 22s ease-in-out infinite alternate;
 }
 .stApp::after {
     bottom: -26vmax; right: -14vmax;
     background: radial-gradient(circle, var(--sl-blob-2), transparent 65%);
-    animation: sl-float-b 26s ease-in-out infinite alternate;
 }
 [data-testid="stAppViewContainer"]::before {
     content: ""; position: fixed; pointer-events: none; z-index: 0;
     top: 20vh; right: 10vw; width: 38vmax; height: 38vmax; border-radius: 50%; filter: blur(80px);
     background: radial-gradient(circle, var(--sl-blob-3), transparent 65%);
-    animation: sl-float-c 30s ease-in-out infinite alternate;
 }
 [data-testid="stAppViewContainer"] > *, [data-testid="stSidebar"] { position: relative; z-index: 1; }
 @keyframes sl-float-a { to { transform: translate(14vmax, 10vmax) scale(1.12); } }
@@ -242,9 +239,8 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
     border: 1px solid var(--sl-border) !important; box-shadow: var(--sl-shadow);
 }
 
-/* Glass helper */
+/* Glass helper (not on chat bubbles: blurring dozens of messages makes every update repaint slowly) */
 [data-testid="stChatInput"], [class*="st-key-example_"] button,
-[data-testid="stChatMessage"]:not(:has(.sl-user)) [data-testid="stChatMessageContent"],
 .st-key-theme_toggle button, .sl-tip, .sl-doc {
     backdrop-filter: blur(18px) saturate(160%);
     -webkit-backdrop-filter: blur(18px) saturate(160%);
@@ -365,7 +361,7 @@ header[data-testid="stHeader"] button, [data-testid="stToolbar"] { pointer-event
 [data-testid="stChatMessage"]:not(:has(.sl-user)) { margin-right: auto; max-width: 94%; }
 
 [data-testid="stChatMessage"]:not(:has(.sl-user)) [data-testid="stChatMessageContent"] {
-    background: var(--sl-surface);
+    background: var(--sl-surface-solid);
     border: 1px solid var(--sl-glass-edge);
     border-radius: 6px 20px 20px 20px;
     padding: 1rem 1.2rem 1.15rem;
@@ -1112,9 +1108,13 @@ def build_css(mode: str) -> str:
     return CSS_TEMPLATE.replace("__VARS__", css_vars)
 
 
-@st.cache_data(ttl=300, show_spinner=False)
+@st.cache_data(ttl=3600, show_spinner=False)
 def cached_list_papers(session_id: str) -> list[str]:
-    """Qdrant scroll is slow; cache per session and clear after adding sources."""
+    """Qdrant scroll takes ~2.5 s (remote cluster); cache per session.
+
+    Only this app changes the collections, and every add/delete clears the cache,
+    so a long TTL is safe and keeps reruns (e.g. sending a message) instant.
+    """
     return list_papers(session_id)
 
 
@@ -2270,9 +2270,12 @@ if not history and not prompt:
 else:
     welcome_slot.empty()
 
+# Every message sits in a keyed container. Saved messages use "hmsg_" keys and the
+# message being sent/answered uses "live_" keys, so Streamlit never reuses the previous
+# run's element at the same position (which left faded badges/status inside new bubbles).
 for idx, msg in enumerate(history):
     avatar = USER_AVATAR if msg["role"] == "user" else ASSISTANT_AVATAR
-    with st.chat_message(msg["role"], avatar=avatar):
+    with st.container(key=f"hmsg_{active_sid}_{idx}"), st.chat_message(msg["role"], avatar=avatar):
         if msg["role"] == "user":
             st.markdown('<span class="sl-user"></span>', unsafe_allow_html=True)
         if msg.get("stopped"):
@@ -2318,12 +2321,12 @@ if prompt:
     if is_btw:
         query = prompt.strip()[4:].strip()
 
-        with st.chat_message("user", avatar=USER_AVATAR):
+        with st.container(key=f"live_btw_u_{active_sid}_{len(history)}"), st.chat_message("user", avatar=USER_AVATAR):
             st.markdown('<span class="sl-user"></span>', unsafe_allow_html=True)
             st.markdown(prompt)
         scroll_to_bottom()
 
-        with st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
+        with st.container(key=f"live_btw_a_{active_sid}_{len(history)}"), st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
             if not query:
                 st.markdown("Please add a question after `/btw`, e.g. `/btw What is attention?`")
             else:
@@ -2353,7 +2356,7 @@ if prompt:
             # Retrying an interrupted question: it is already the last message shown.
             if st.session_state.chats[active_sid] and st.session_state.chats[active_sid][-1]["role"] == "user":
                 st.session_state.chats[active_sid].pop()
-        with st.chat_message("user", avatar=USER_AVATAR):
+        with st.container(key=f"live_u_{active_sid}_{len(history)}"), st.chat_message("user", avatar=USER_AVATAR):
             st.markdown('<span class="sl-user"></span>', unsafe_allow_html=True)
             st.markdown(prompt)
         scroll_to_bottom()
@@ -2361,8 +2364,6 @@ if prompt:
         st.session_state.turns[active_sid] += 1
         current_turn = st.session_state.turns[active_sid]
 
-        if is_first_message:
-            maybe_rename_session(active_sid, prompt)
 
         input_state = {
             "messages": [HumanMessage(content=prompt)],
@@ -2380,7 +2381,7 @@ if prompt:
         }
         config = {"configurable": {"thread_id": active_sid}}
 
-        with st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
+        with st.container(key=f"live_a_{active_sid}_{len(history)}"), st.chat_message("assistant", avatar=ASSISTANT_AVATAR):
             status = st.status("Thinking…", expanded=False)
             fallback_before = fallback_calls()
             placeholder = st.empty()
@@ -2455,6 +2456,8 @@ if prompt:
         )
 
         if is_first_message:
+            # Named after the answer so the first reply isn't delayed by an extra LLM call.
+            maybe_rename_session(active_sid, prompt)
             st.rerun()
 
 # A source was queued this run: rerun now that the page (without the dialog) is drawn.
